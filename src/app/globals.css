@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-teal-mist text-slate-800 antialiased;
+}
+
+input, select, textarea {
+  @apply outline-none;
+}
+input:focus, select:focus, textarea:focus {
+  @apply ring-2 ring-teal-light border-transparent;
+}
