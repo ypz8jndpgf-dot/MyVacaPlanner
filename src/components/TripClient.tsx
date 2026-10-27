@@ -4,11 +4,26 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import type { Attendee, Expense, Flight, Rsvp, ScheduleItem, Trip } from "@/lib/types";
 import { computeBalances, dateRange, formatDate, formatMoney, formatTime, settleUp } from "@/lib/logic";
+import {
+  ArrowRightIcon,
+  Avatar,
+  CalendarIcon,
+  CheckIcon,
+  ClockIcon,
+  CoinsIcon,
+  EmptyState,
+  PinIcon,
+  PlaneIcon,
+  PlaneLandIcon,
+  PlaneTakeoffIcon,
+  SunIcon,
+  UsersIcon,
+} from "@/components/ui";
 
 type Tab = "crew" | "schedule" | "flights" | "money";
 
-const inputCls = "w-full rounded-xl border border-slate-300 px-3 py-2.5 bg-white";
-const labelCls = "block text-xs font-semibold text-slate-500 mb-1";
+const inputCls = "input-warm";
+const labelCls = "label-warm";
 
 async function api(path: string, method: string, body?: unknown) {
   const res = await fetch(path, {
@@ -68,61 +83,115 @@ export default function TripClient({ slug }: { slug: string }) {
 
   if (notFound) {
     return (
-      <main className="mx-auto max-w-xl px-4 py-20 text-center">
-        <p className="text-5xl">🏝️</p>
-        <h1 className="mt-4 text-xl font-bold text-teal-dark">Trip not found</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          This link doesn&apos;t point to a trip. Check the link with whoever sent it.
-        </p>
-        <a href="/" className="mt-6 inline-block rounded-xl bg-teal px-5 py-2.5 font-semibold text-white">
-          Go to MyVacaPlanner
-        </a>
+      <main className="mx-auto max-w-xl px-4 py-20">
+        <div className="card">
+          <EmptyState
+            icon={<span className="text-4xl">🏝️</span>}
+            tint="#FFE9E6"
+            title="Trip not found"
+            line="This link doesn't point to a trip. Check the link with whoever sent it."
+          >
+            <a href="/" className="btn-teal mt-5 px-6 py-2.5">
+              Go to MyVacaPlanner
+            </a>
+          </EmptyState>
+        </div>
       </main>
     );
   }
 
   if (!trip) {
     return (
-      <main className="mx-auto max-w-xl px-4 py-20 text-center text-slate-500">
-        <Image src="/logo.webp" alt="" width={72} height={72} className="mx-auto rounded-2xl opacity-80" />
-        <p className="mt-4">Loading your trip…</p>
+      <main className="mx-auto max-w-xl px-4 py-20 text-center">
+        <Image
+          src="/logo.webp"
+          alt=""
+          width={80}
+          height={80}
+          className="mx-auto animate-pulse rounded-[1.6rem] shadow-card"
+        />
+        <p className="mt-5 font-display text-lg font-bold text-teal-dark">Unpacking your trip…</p>
       </main>
     );
   }
 
   const inCount = trip.attendees.filter((a) => a.rsvp === "in").length;
+  const crewStack = [...trip.attendees].sort(
+    (a, b) => ({ in: 0, maybe: 1, out: 2 })[a.rsvp] - ({ in: 0, maybe: 1, out: 2 })[b.rsvp]
+  );
 
   return (
     <main className="mx-auto max-w-xl px-4 pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-20 -mx-4 bg-teal px-4 pb-4 pt-4 shadow-md">
-        <div className="flex items-center gap-3">
-          <Image src="/logo.webp" alt="MyVacaPlanner" width={44} height={44} className="rounded-xl" />
+      {/* ------- Header ------- */}
+      <header className="sticky top-0 z-20 -mx-4 overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-teal-deep via-teal to-teal-light px-4 pb-4 pt-4 shadow-lift">
+        <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-amber/20 blur-2xl" />
+        <div className="relative flex items-center gap-3">
+          <Image
+            src="/logo.webp"
+            alt="MyVacaPlanner"
+            width={46}
+            height={46}
+            className="rounded-2xl shadow-md ring-2 ring-white/30"
+          />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-extrabold text-white">{trip.name}</h1>
-            <p className="truncate text-xs text-teal-mist">
-              {formatDate(trip.startDate)} – {formatDate(trip.endDate)}
-              {trip.location ? ` · ${trip.location}` : ""} · {inCount} in
-            </p>
+            <h1 className="truncate font-display text-[22px] font-bold leading-tight text-white">{trip.name}</h1>
+            <p className="truncate text-xs font-bold text-teal-mist/90">MyVacaPlanner trip HQ</p>
           </div>
           <ShareButton slug={slug} />
         </div>
-        <nav className="mt-4 grid grid-cols-4 gap-1 rounded-full bg-teal-dark p-1 text-center text-sm font-semibold">
+
+        <div className="relative mt-3 flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold text-white">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 ring-1 ring-white/20">
+            <CalendarIcon className="h-3.5 w-3.5" />
+            {formatDate(trip.startDate)} – {formatDate(trip.endDate)}
+          </span>
+          {trip.location && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1.5 ring-1 ring-white/20">
+              <PinIcon className="h-3.5 w-3.5 text-amber" />
+              {trip.location}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 ring-1 ring-white/20">
+            <UsersIcon className="h-3.5 w-3.5" />
+            {inCount} in
+          </span>
+        </div>
+
+        {crewStack.length > 0 && (
+          <div className="relative mt-3 flex items-center">
+            <div className="flex -space-x-2">
+              {crewStack.slice(0, 6).map((a) => (
+                <Avatar key={a.id} name={a.name} size="sm" className="ring-2 ring-teal" />
+              ))}
+              {crewStack.length > 6 && (
+                <span className="z-10 flex h-8 w-8 items-center justify-center rounded-full bg-amber font-display text-xs font-bold text-teal-deep ring-2 ring-teal">
+                  +{crewStack.length - 6}
+                </span>
+              )}
+            </div>
+            <span className="ml-3 text-xs font-bold text-teal-mist">
+              {crewStack.length === 1 ? "Just getting started" : "The crew so far"}
+            </span>
+          </div>
+        )}
+
+        <nav className="relative mt-4 grid grid-cols-4 gap-1 rounded-full bg-teal-deep/80 p-1 text-center shadow-inner">
           {(
             [
-              ["schedule", "📅 Plan"],
-              ["flights", "✈️ Flights"],
-              ["money", "💸 Money"],
-              ["crew", "👥 Crew"],
-            ] as [Tab, string][]
-          ).map(([key, label]) => (
+              ["schedule", "Plan", CalendarIcon],
+              ["flights", "Flights", PlaneIcon],
+              ["money", "Money", CoinsIcon],
+              ["crew", "Crew", UsersIcon],
+            ] as [Tab, string, React.ComponentType<{ className?: string }>][]
+          ).map(([key, label, Icon]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`rounded-full py-2 transition ${
-                tab === key ? "bg-white text-teal-dark" : "text-teal-mist hover:text-white"
+              className={`flex items-center justify-center gap-1.5 rounded-full py-2 text-[13px] font-extrabold transition duration-200 ${
+                tab === key ? "bg-white text-teal-dark shadow-md" : "text-teal-mist hover:text-white"
               }`}
             >
+              <Icon className="h-4 w-4" />
               {label}
             </button>
           ))}
@@ -152,7 +221,10 @@ export default function TripClient({ slug }: { slug: string }) {
       {tab === "money" && <MoneyTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
 
       {toast && (
-        <div className="fixed bottom-5 left-1/2 z-30 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl bg-teal-deep px-4 py-3 text-center text-sm font-semibold text-white shadow-xl">
+        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-center gap-2 rounded-full bg-teal-deep px-4 py-3 text-center text-sm font-bold text-white shadow-lift">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber text-teal-deep">
+            <CheckIcon className="h-3 w-3" />
+          </span>
           {toast}
         </div>
       )}
@@ -177,10 +249,7 @@ function ShareButton({ slug }: { slug: string }) {
     setTimeout(() => setCopied(false), 2000);
   }
   return (
-    <button
-      onClick={share}
-      className="shrink-0 rounded-full bg-amber px-4 py-2 text-sm font-bold text-teal-deep shadow-sm"
-    >
+    <button onClick={share} className="btn-amber shrink-0 px-4 py-2 text-sm">
       {copied ? "Link copied ✓" : "Invite 🔗"}
     </button>
   );
@@ -216,49 +285,64 @@ function JoinCard({
   }
 
   return (
-    <section className="mt-4 rounded-2xl border-2 border-amber bg-amber-soft p-5 shadow-sm">
-      <h2 className="font-bold text-teal-dark">You&apos;re invited to {tripName} 🎉</h2>
-      <p className="mt-1 text-sm text-slate-600">Pick your name if you&apos;re already on the list, or join fresh:</p>
-      {attendees.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {attendees.map((a) => (
-            <button
-              key={a.id}
-              disabled={busy}
-              onClick={() => join(a.rsvp, a.name)}
-              className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-teal-dark shadow-sm"
-            >
-              {a.name}
-              {a.isOrganizer ? " ⭐" : ""}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="mt-4 flex gap-2">
+    <section className="card mt-5 overflow-hidden p-0 shadow-lift">
+      <div className="bg-gradient-to-r from-amber to-[#F8BE60] px-5 py-4">
+        <h2 className="font-display text-xl font-bold text-teal-deep">You&apos;re invited to {tripName} 🎉</h2>
+        <p className="mt-0.5 text-sm font-bold text-teal-deep/70">
+          No account, no fuss — just claim your spot on the crew list.
+        </p>
+      </div>
+      <div className="p-5">
+        {attendees.length > 0 && (
+          <>
+            <p className="text-sm font-semibold text-ink-soft">Already on the list? Tap your name:</p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {attendees.map((a) => (
+                <button
+                  key={a.id}
+                  disabled={busy}
+                  onClick={() => join(a.rsvp, a.name)}
+                  className="inline-flex items-center gap-2 rounded-full bg-cream-deep py-1 pl-1 pr-3.5 font-display text-sm font-bold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:-translate-y-0.5 hover:ring-amber disabled:opacity-50"
+                >
+                  <Avatar name={a.name} size="sm" />
+                  {a.name}
+                  {a.isOrganizer && <span className="text-amber-dark">★</span>}
+                </button>
+              ))}
+            </div>
+            <div className="my-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-widest text-ink-soft/70">
+              <span className="h-px flex-1 bg-cream-edge" /> New here? <span className="h-px flex-1 bg-cream-edge" />
+            </div>
+          </>
+        )}
+        <label className={labelCls} htmlFor="join-name">Your name</label>
         <input
-          placeholder="Your name"
+          id="join-name"
+          placeholder="e.g. Sam Rivera"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className={inputCls}
         />
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            disabled={busy || !name.trim()}
+            onClick={() => join("in", name)}
+            className="btn-coral py-3"
+          >
+            I&apos;m in 🙌
+          </button>
+          <button
+            disabled={busy || !name.trim()}
+            onClick={() => join("out", name)}
+            className="btn-ghost py-3"
+          >
+            Can&apos;t make it
+          </button>
+        </div>
+        {error && (
+          <p className="mt-3 rounded-2xl bg-coral-soft px-4 py-2.5 text-sm font-bold text-coral-dark">{error}</p>
+        )}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
-          disabled={busy || !name.trim()}
-          onClick={() => join("in", name)}
-          className="rounded-xl bg-coral py-2.5 font-bold text-white disabled:opacity-50"
-        >
-          I&apos;m in 🙌
-        </button>
-        <button
-          disabled={busy || !name.trim()}
-          onClick={() => join("out", name)}
-          className="rounded-xl bg-white py-2.5 font-bold text-slate-600 shadow-sm disabled:opacity-50"
-        >
-          Can&apos;t make it
-        </button>
-      </div>
-      {error && <p className="mt-2 text-sm font-medium text-coral-dark">{error}</p>}
     </section>
   );
 }
@@ -266,6 +350,12 @@ function JoinCard({
 /* ---------------- Crew ---------------- */
 
 type Mutate = (path: string, method: string, body: unknown, okMsg: string) => Promise<unknown>;
+
+const RSVP_STYLE: Record<Rsvp, { chip: string; activeBtn: string }> = {
+  in: { chip: "bg-teal text-white", activeBtn: "bg-teal text-white shadow-teal" },
+  maybe: { chip: "bg-amber text-teal-deep", activeBtn: "bg-amber text-teal-deep shadow-amber" },
+  out: { chip: "bg-slate-300 text-slate-600", activeBtn: "bg-slate-400 text-white" },
+};
 
 function CrewTab({
   trip,
@@ -285,64 +375,93 @@ function CrewTab({
     { key: "maybe", title: "Maybe", emoji: "🤔" },
     { key: "out", title: "Out", emoji: "😢" },
   ];
+  const inCount = trip.attendees.filter((a) => a.rsvp === "in").length;
   return (
-    <section className="mt-4 space-y-4">
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="font-bold text-teal-dark">
-          The crew · {trip.attendees.filter((a) => a.rsvp === "in").length} in
-        </h2>
+    <section className="mt-5 space-y-4">
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-teal-dark">The crew</h2>
+          <span className="rounded-full bg-amber-soft px-3 py-1 font-display text-sm font-bold text-amber-dark">
+            {inCount} in
+          </span>
+        </div>
+
         {me && (
-          <div className="mt-3 flex items-center gap-2 text-sm">
-            <span className="text-slate-500">You&apos;re going as</span>
-            <span className="font-bold text-teal-dark">{me.name}</span>
-            <span className="flex gap-1">
+          <div className="mt-4 rounded-3xl bg-cream-deep/70 p-3.5 ring-1 ring-cream-edge/60">
+            <div className="flex items-center gap-3">
+              <Avatar name={me.name} size="md" />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold text-ink-soft">You&apos;re going as</div>
+                <div className="truncate font-display text-base font-bold text-teal-dark">{me.name}</div>
+              </div>
+              <button
+                className="shrink-0 text-xs font-bold text-ink-soft underline decoration-amber decoration-2 underline-offset-2"
+                onClick={() => {
+                  localStorage.removeItem(`mvp:me:${slug}`);
+                  setMeId(null);
+                }}
+              >
+                switch person
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-1 rounded-full bg-white p-1 shadow-inner ring-1 ring-cream-edge/70">
               {(["in", "maybe", "out"] as Rsvp[]).map((r) => (
                 <button
                   key={r}
                   onClick={() =>
                     mutate(`/api/trips/${trip.slug}/attendees`, "PATCH", { id: me.id, actorId: me.id, rsvp: r }, "RSVP updated")
                   }
-                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                    me.rsvp === r ? "bg-teal text-white" : "bg-slate-100 text-slate-500"
+                  className={`rounded-full py-1.5 text-xs font-extrabold transition ${
+                    me.rsvp === r ? RSVP_STYLE[r].activeBtn : "text-ink-soft hover:text-teal-dark"
                   }`}
                 >
-                  {r === "in" ? "In" : r === "maybe" ? "Maybe" : "Out"}
+                  {r === "in" ? "🙌 In" : r === "maybe" ? "🤔 Maybe" : "😢 Out"}
                 </button>
               ))}
-            </span>
-            <button
-              className="ml-auto text-xs text-slate-400 underline"
-              onClick={() => {
-                localStorage.removeItem(`mvp:me:${slug}`);
-                setMeId(null);
-              }}
-            >
-              switch person
-            </button>
+            </div>
           </div>
         )}
+
+        {trip.attendees.length === 0 && (
+          <EmptyState
+            icon={<UsersIcon className="h-10 w-10" />}
+            title="No one's here yet"
+            line="Send that invite link around — first one in gets organizer bragging rights."
+          />
+        )}
+
         {groups.map(({ key, title, emoji }) => {
           const people = trip.attendees.filter((a) => a.rsvp === key);
           if (people.length === 0) return null;
           return (
-            <div key={key} className="mt-4">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                {emoji} {title} · {people.length}
+            <div key={key} className="mt-5">
+              <h3 className="flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${RSVP_STYLE[key].chip}`}>
+                  {emoji} {title}
+                </span>
+                <span className="text-xs font-bold text-ink-soft">
+                  {people.length} {people.length === 1 ? "person" : "people"}
+                </span>
               </h3>
-              <ul className="mt-1 divide-y divide-slate-100">
+              <ul className="mt-2 space-y-1.5">
                 {people.map((a) => (
-                  <li key={a.id} className="flex items-center py-2.5">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-mist font-bold text-teal-dark">
-                      {a.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="ml-3 font-semibold text-slate-700">
+                  <li
+                    key={a.id}
+                    className="flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-cream/70"
+                  >
+                    <Avatar name={a.name} size="md" />
+                    <span className="min-w-0 flex-1 truncate font-display text-[15px] font-bold text-ink">
                       {a.name}
-                      {a.isOrganizer && <span className="ml-2 rounded-full bg-amber-soft px-2 py-0.5 text-xs font-bold text-amber-dark">organizer</span>}
-                      {me?.id === a.id && <span className="ml-2 text-xs text-slate-400">(you)</span>}
+                      {me?.id === a.id && <span className="ml-1.5 text-xs font-bold text-ink-soft">(you)</span>}
                     </span>
+                    {a.isOrganizer && (
+                      <span className="shrink-0 rounded-full bg-amber-soft px-2.5 py-1 text-[11px] font-extrabold text-amber-dark">
+                        ★ organizer
+                      </span>
+                    )}
                     {me?.isOrganizer && !a.isOrganizer && (
                       <button
-                        className="ml-auto text-xs text-slate-400 underline"
+                        className="shrink-0 text-xs font-bold text-coral-dark underline decoration-coral/50 underline-offset-2"
                         onClick={() =>
                           mutate(`/api/trips/${trip.slug}/attendees`, "DELETE", { id: a.id, actorId: me.id }, "Removed")
                         }
@@ -357,8 +476,8 @@ function CrewTab({
           );
         })}
       </div>
-      <p className="text-center text-xs text-slate-400">
-        Anyone with the trip link can join — share it from the Invite button up top.
+      <p className="px-4 text-center text-xs font-semibold text-ink-soft">
+        Anyone with the trip link can join — pass it around from the Invite button up top.
       </p>
     </section>
   );
@@ -381,6 +500,7 @@ function ScheduleTab({ trip, me, mutate }: { trip: Trip; me?: Attendee; mutate: 
     return map;
   }, [trip.schedule]);
   const extraDays = [...byDay.keys()].filter((d) => !days.includes(d)).sort();
+  const allDays = [...days, ...extraDays];
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -393,92 +513,131 @@ function ScheduleTab({ trip, me, mutate }: { trip: Trip; me?: Attendee; mutate: 
     setForm({ title: "", date: trip.startDate, time: "", location: "", notes: "" });
   }
 
-  function renderDay(day: string) {
+  function renderDay(day: string, isLast: boolean) {
     const items = byDay.get(day) ?? [];
+    const dayIndex = days.indexOf(day);
     return (
-      <div key={day} className="rounded-2xl bg-white p-4 shadow-sm">
-        <h3 className="font-bold text-teal-dark">{formatDate(day)}</h3>
-        {items.length === 0 ? (
-          <p className="mt-1 text-sm text-slate-400">Nothing planned yet.</p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {items.map((item) => (
-              <li key={item.id} className="rounded-xl bg-teal-mist/60 px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-semibold text-slate-800">{item.title}</span>
-                    {item.time && <span className="ml-2 text-sm font-medium text-teal">{formatTime(item.time)}</span>}
-                    {item.location && <div className="text-sm text-slate-500">📍 {item.location}</div>}
-                    {item.notes && <div className="text-sm text-slate-500">{item.notes}</div>}
+      <div key={day} className="flex gap-3">
+        {/* timeline rail */}
+        <div className="flex w-10 shrink-0 flex-col items-center">
+          <span className="z-10 flex h-10 w-10 items-center justify-center rounded-full bg-amber-soft text-amber-dark shadow-sm ring-4 ring-cream">
+            <SunIcon className="h-5 w-5" />
+          </span>
+          {!isLast && <span className="my-1 w-0 flex-1 border-l-2 border-dashed border-teal/25" />}
+        </div>
+        {/* day card */}
+        <div className="card mb-4 min-w-0 flex-1 p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="font-display text-lg font-bold text-teal-dark">{formatDate(day)}</h3>
+            {dayIndex >= 0 && (
+              <span className="shrink-0 rounded-full bg-teal-mist px-2.5 py-0.5 text-[11px] font-extrabold text-teal-dark">
+                Day {dayIndex + 1}
+              </span>
+            )}
+          </div>
+          {items.length === 0 ? (
+            <div className="mt-2.5 rounded-2xl border-2 border-dashed border-cream-edge bg-cream/60 px-4 py-3.5 text-sm font-semibold text-ink-soft">
+              Nothing planned yet — this day is wide open. 🌤️
+            </div>
+          ) : (
+            <ul className="mt-2.5 space-y-2">
+              {items.map((item) => (
+                <li key={item.id} className="rounded-2xl bg-cream-deep/60 px-3.5 py-3 ring-1 ring-cream-edge/50">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {item.time && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-extrabold text-teal-dark shadow-sm">
+                            <ClockIcon className="h-3.5 w-3.5 text-coral" />
+                            {formatTime(item.time)}
+                          </span>
+                        )}
+                        <span className="font-display text-[15px] font-bold text-ink">{item.title}</span>
+                      </div>
+                      {item.location && (
+                        <div className="mt-1 flex items-center gap-1 text-sm font-semibold text-ink-soft">
+                          <PinIcon className="h-3.5 w-3.5 text-coral" /> {item.location}
+                        </div>
+                      )}
+                      {item.notes && <div className="mt-0.5 text-sm font-medium text-ink-soft">{item.notes}</div>}
+                    </div>
+                    {me && (me.isOrganizer || item.createdBy === me.id) && (
+                      <span className="flex shrink-0 gap-1.5 text-[11px] font-extrabold">
+                        <button
+                          className="rounded-full bg-white px-2.5 py-1 text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+                          onClick={() => {
+                            setEditing(item);
+                            setForm({
+                              title: item.title,
+                              date: item.date,
+                              time: item.time ?? "",
+                              location: item.location ?? "",
+                              notes: item.notes ?? "",
+                            });
+                          }}
+                        >
+                          edit
+                        </button>
+                        <button
+                          className="rounded-full bg-white px-2.5 py-1 text-coral-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-coral"
+                          onClick={() =>
+                            mutate(`/api/trips/${trip.slug}/schedule`, "DELETE", { id: item.id, actorId: me.id }, "Deleted")
+                          }
+                        >
+                          delete
+                        </button>
+                      </span>
+                    )}
                   </div>
-                  {me && (me.isOrganizer || item.createdBy === me.id) && (
-                    <span className="flex shrink-0 gap-2 text-xs">
-                      <button
-                        className="font-semibold text-teal underline"
-                        onClick={() => {
-                          setEditing(item);
-                          setForm({
-                            title: item.title,
-                            date: item.date,
-                            time: item.time ?? "",
-                            location: item.location ?? "",
-                            notes: item.notes ?? "",
-                          });
-                        }}
-                      >
-                        edit
-                      </button>
-                      <button
-                        className="font-semibold text-coral-dark underline"
-                        onClick={() =>
-                          mutate(`/api/trips/${trip.slug}/schedule`, "DELETE", { id: item.id, actorId: me.id }, "Deleted")
-                        }
-                      >
-                        delete
-                      </button>
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <section className="mt-4 space-y-3">
-      {days.map(renderDay)}
-      {extraDays.map(renderDay)}
+    <section className="mt-5">
+      <div>{allDays.map((day, i) => renderDay(day, i === allDays.length - 1))}</div>
       {me ? (
-        <form onSubmit={submit} className="rounded-2xl bg-white p-4 shadow-sm">
-          <h3 className="font-bold text-teal-dark">{editing ? "Edit plan" : "Add to the plan"}</h3>
-          <div className="mt-3 space-y-3">
-            <input required placeholder="What's happening? (Tee time, dinner, poker…)" value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} />
+        <form onSubmit={submit} className="card mt-1 p-5">
+          <h3 className="font-display text-lg font-bold text-teal-dark">{editing ? "Edit plan" : "Add to the plan"}</h3>
+          <div className="mt-3 space-y-3.5">
+            <div>
+              <label className={labelCls}>What&apos;s happening?</label>
+              <input required placeholder="Tee time, dinner, poker night…" value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Date</label>
+                <label className={labelCls}>Which day</label>
                 <input type="date" required value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Time (optional)</label>
+                <label className={labelCls}>What time? (optional)</label>
                 <input type="time" value={form.time}
                   onChange={(e) => setForm({ ...form, time: e.target.value })} className={inputCls} />
               </div>
             </div>
-            <input placeholder="Location (optional)" value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })} className={inputCls} />
-            <input placeholder="Notes (optional — reservation #, etc.)" value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} />
+            <div>
+              <label className={labelCls}>Where? (optional)</label>
+              <input placeholder="Course, restaurant, the house…" value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Good-to-knows (optional)</label>
+              <input placeholder="Reservation #, dress code, who's driving…" value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} />
+            </div>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 rounded-xl bg-teal py-2.5 font-bold text-white">
-                {editing ? "Save changes" : "Add"}
+              <button type="submit" className="btn-teal flex-1 py-3">
+                {editing ? "Save changes" : "Add it in"}
               </button>
               {editing && (
-                <button type="button" className="rounded-xl bg-slate-100 px-4 font-semibold text-slate-500"
+                <button type="button" className="btn-ghost px-5"
                   onClick={() => { setEditing(null); setForm({ title: "", date: trip.startDate, time: "", location: "", notes: "" }); }}>
                   Cancel
                 </button>
@@ -487,7 +646,13 @@ function ScheduleTab({ trip, me, mutate }: { trip: Trip; me?: Attendee; mutate: 
           </div>
         </form>
       ) : (
-        <p className="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow-sm">Join the trip to add plans.</p>
+        <div className="card mt-1">
+          <EmptyState
+            icon={<CalendarIcon className="h-10 w-10" />}
+            title="Want in on the planning?"
+            line="Join the trip and you can add tee times, dinners, and everything in between."
+          />
+        </div>
       )}
     </section>
   );
@@ -534,32 +699,58 @@ function FlightsTab({
     [trip.flights]
   );
 
-  function FlightRow({ f, when }: { f: Flight; when: string }) {
+  function FlightPass({ f, kind }: { f: Flight; kind: "inbound" | "outbound" }) {
     const mine = me && (me.isOrganizer || f.attendeeId === me.id);
+    const bigTime = kind === "inbound" ? f.arriveTime : f.departTime;
+    const bigLabel = kind === "inbound" ? "Lands" : "Takes off";
+    const smallNote =
+      kind === "inbound" ? `departs ${formatTime(f.departTime)}` : `arrives ${formatTime(f.arriveTime)}`;
     return (
-      <li className="flex items-center gap-3 rounded-xl bg-teal-mist/60 px-3 py-2.5">
-        <div className="text-center">
-          <div className="text-lg font-extrabold leading-none text-teal-dark">{formatTime(when)}</div>
-          <div className="mt-0.5 text-[11px] font-semibold text-slate-500">{formatDate(f.date)}</div>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-slate-800">
-            {nameOf(f.attendeeId)} · {f.fromAirport} → {f.toAirport}
+      <article className="card overflow-hidden p-0 shadow-card">
+        <div className="px-5 pb-4 pt-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar name={nameOf(f.attendeeId)} size="md" />
+              <div className="min-w-0">
+                <div className="truncate font-display text-[15px] font-bold leading-tight text-ink">
+                  {nameOf(f.attendeeId)}
+                </div>
+                <div className="truncate text-xs font-bold text-ink-soft">
+                  {f.airline}
+                  {f.flightNumber ? ` ${f.flightNumber}` : ""}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ink-soft">{bigLabel}</div>
+              <div className="font-display text-[26px] font-bold leading-none text-teal-dark">{formatTime(bigTime)}</div>
+              <div className="mt-0.5 text-xs font-bold text-ink-soft">{formatDate(f.date)}</div>
+            </div>
           </div>
-          <div className="text-sm text-slate-500">
-            {f.airline}
-            {f.flightNumber ? ` ${f.flightNumber}` : ""} · departs {formatTime(f.departTime)}
+          <div className="mt-4 flex items-center gap-2">
+            <span className="font-display text-xl font-bold tracking-wide text-ink">{f.fromAirport}</span>
+            <span className="relative flex-1 border-t-[3px] border-dotted border-teal/30">
+              <PlaneIcon className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rotate-90 bg-white px-0.5 text-coral" />
+            </span>
+            <span className="font-display text-xl font-bold tracking-wide text-ink">{f.toAirport}</span>
           </div>
+          <div className="mt-1 text-xs font-semibold text-ink-soft">{smallNote}</div>
         </div>
-        {mine && (
-          <button
-            className="shrink-0 text-xs font-semibold text-coral-dark underline"
-            onClick={() => mutate(`/api/trips/${trip.slug}/flights`, "DELETE", { id: f.id, actorId: me!.id }, "Flight removed")}
-          >
-            delete
-          </button>
-        )}
-      </li>
+        <div className="ticket-divider mx-5" style={{ "--notch": "31px" } as React.CSSProperties} />
+        <div className="flex items-center justify-between px-5 py-2.5 text-xs font-bold text-ink-soft">
+          <span>
+            {kind === "inbound" ? "🛬 Arrival" : "🛫 Departure"} · MyVacaPlanner boarding pass
+          </span>
+          {mine && (
+            <button
+              className="font-extrabold text-coral-dark underline decoration-coral/50 underline-offset-2"
+              onClick={() => mutate(`/api/trips/${trip.slug}/flights`, "DELETE", { id: f.id, actorId: me!.id }, "Flight removed")}
+            >
+              delete
+            </button>
+          )}
+        </div>
+      </article>
     );
   }
 
@@ -575,37 +766,58 @@ function FlightsTab({
   }
 
   return (
-    <section className="mt-4 space-y-3">
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <h3 className="font-bold text-teal-dark">🛬 Arrivals board</h3>
-        <p className="text-xs text-slate-400">Who lands when — plan the airport runs.</p>
+    <section className="mt-5 space-y-6">
+      <div>
+        <div className="flex items-center gap-2.5 px-1">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal text-white shadow-teal">
+            <PlaneLandIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Arrivals board</h3>
+            <p className="text-xs font-semibold text-ink-soft">Who lands when — plan the airport runs.</p>
+          </div>
+        </div>
         {arrivals.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-400">No flights yet. Add yours below.</p>
+          <div className="card mt-3">
+            <EmptyState
+              icon={<PlaneLandIcon className="h-10 w-10" />}
+              title="No flights on the board yet"
+              line="Add yours and the crew can plan airport runs, rideshares, and heroic coffee deliveries."
+            />
+          </div>
         ) : (
-          <ul className="mt-2 space-y-2">
+          <div className="mt-3 space-y-3">
             {arrivals.map((f) => (
-              <FlightRow key={f.id} f={f} when={f.arriveTime} />
+              <FlightPass key={f.id} f={f} kind="inbound" />
             ))}
-          </ul>
+          </div>
         )}
       </div>
 
       {departures.length > 0 && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <h3 className="font-bold text-teal-dark">🛫 Heading home</h3>
-          <ul className="mt-2 space-y-2">
+        <div>
+          <div className="flex items-center gap-2.5 px-1">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-coral text-white shadow-coral">
+              <PlaneTakeoffIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Heading home</h3>
+              <p className="text-xs font-semibold text-ink-soft">The sad part of the board. Sorry.</p>
+            </div>
+          </div>
+          <div className="mt-3 space-y-3">
             {departures.map((f) => (
-              <FlightRow key={f.id} f={f} when={f.departTime} />
+              <FlightPass key={f.id} f={f} kind="outbound" />
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
       {me ? (
         showForm ? (
-          <form onSubmit={submit} className="rounded-2xl bg-white p-4 shadow-sm">
-            <h3 className="font-bold text-teal-dark">Add a flight</h3>
-            <div className="mt-3 space-y-3">
+          <form onSubmit={submit} className="card p-5">
+            <h3 className="font-display text-lg font-bold text-teal-dark">Add a flight</h3>
+            <div className="mt-3 space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Who&apos;s flying</label>
@@ -625,7 +837,7 @@ function FlightsTab({
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Direction</label>
+                  <label className={labelCls}>Which way?</label>
                   <select
                     value={form.direction}
                     onChange={(e) => setForm({ ...form, direction: e.target.value as "inbound" | "outbound" })}
@@ -637,49 +849,67 @@ function FlightsTab({
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <input required placeholder="Airline (e.g. JetBlue)" value={form.airline}
-                  onChange={(e) => setForm({ ...form, airline: e.target.value })} className={inputCls} />
-                <input placeholder="Flight # (e.g. 1234)" value={form.flightNumber}
-                  onChange={(e) => setForm({ ...form, flightNumber: e.target.value })} className={inputCls} />
+                <div>
+                  <label className={labelCls}>Airline</label>
+                  <input required placeholder="e.g. JetBlue" value={form.airline}
+                    onChange={(e) => setForm({ ...form, airline: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Flight #</label>
+                  <input placeholder="e.g. 1234" value={form.flightNumber}
+                    onChange={(e) => setForm({ ...form, flightNumber: e.target.value })} className={inputCls} />
+                </div>
               </div>
               <div>
-                <label className={labelCls}>Date</label>
+                <label className={labelCls}>Flying on</label>
                 <input type="date" required value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <input required placeholder="From (e.g. BOS)" maxLength={4} value={form.fromAirport}
-                  onChange={(e) => setForm({ ...form, fromAirport: e.target.value })} className={inputCls} />
-                <input required placeholder="To (e.g. FLL)" maxLength={4} value={form.toAirport}
-                  onChange={(e) => setForm({ ...form, toAirport: e.target.value })} className={inputCls} />
+                <div>
+                  <label className={labelCls}>From</label>
+                  <input required placeholder="BOS" maxLength={4} value={form.fromAirport}
+                    onChange={(e) => setForm({ ...form, fromAirport: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>To</label>
+                  <input required placeholder="FLL" maxLength={4} value={form.toAirport}
+                    onChange={(e) => setForm({ ...form, toAirport: e.target.value })} className={inputCls} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Departs</label>
+                  <label className={labelCls}>Wheels up</label>
                   <input type="time" required value={form.departTime}
                     onChange={(e) => setForm({ ...form, departTime: e.target.value })} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Arrives</label>
+                  <label className={labelCls}>Touchdown</label>
                   <input type="time" required value={form.arriveTime}
                     onChange={(e) => setForm({ ...form, arriveTime: e.target.value })} className={inputCls} />
                 </div>
               </div>
               <div className="flex gap-2">
-                <button type="submit" className="flex-1 rounded-xl bg-teal py-2.5 font-bold text-white">Add flight</button>
+                <button type="submit" className="btn-teal flex-1 py-3">Add flight</button>
                 <button type="button" onClick={() => setShowForm(false)}
-                  className="rounded-xl bg-slate-100 px-4 font-semibold text-slate-500">Cancel</button>
+                  className="btn-ghost px-5">Cancel</button>
               </div>
             </div>
           </form>
         ) : (
-          <button onClick={() => setShowForm(true)}
-            className="w-full rounded-2xl bg-teal py-3 font-bold text-white shadow-sm">
+          <button onClick={() => setShowForm(true)} className="btn-teal w-full py-3.5">
             + Add a flight
           </button>
         )
       ) : (
-        <p className="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow-sm">Join the trip to add your flights.</p>
+        <div className="card">
+          <EmptyState
+            icon={<PlaneIcon className="h-10 w-10" />}
+            tint="#FFE9E6"
+            title="Flying in?"
+            line="Join the trip to put your flight on the board so the crew knows when to expect you."
+          />
+        </div>
       )}
     </section>
   );
@@ -734,24 +964,33 @@ function MoneyTab({
   }
 
   return (
-    <section className="mt-4 space-y-3">
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <h3 className="font-bold text-teal-dark">Balances</h3>
-        <ul className="mt-2 space-y-1.5">
+    <section className="mt-5 space-y-5">
+      {/* Balances */}
+      <div className="card p-5">
+        <h3 className="font-display text-xl font-bold text-teal-dark">Who&apos;s up, who&apos;s down</h3>
+        <p className="text-sm font-medium text-ink-soft">The trip tab, kept honest.</p>
+        <ul className="mt-3 space-y-1">
           {trip.attendees.map((a) => {
             const net = balances.get(a.id) ?? 0;
             return (
-              <li key={a.id} className="flex items-center justify-between">
-                <span className="font-semibold text-slate-700">
+              <li key={a.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-cream/70">
+                <Avatar name={a.name} size="md" />
+                <span className="min-w-0 flex-1 truncate font-display text-[15px] font-bold text-ink">
                   {a.name}
-                  {me?.id === a.id && <span className="ml-1 text-xs text-slate-400">(you)</span>}
+                  {me?.id === a.id && <span className="ml-1.5 text-xs font-bold text-ink-soft">(you)</span>}
                 </span>
                 {net > 0 ? (
-                  <span className="font-bold text-teal">is owed {formatMoney(net)}</span>
+                  <span className="shrink-0 rounded-full bg-teal-mist px-3 py-1.5 text-sm font-extrabold text-teal-dark">
+                    is owed {formatMoney(net)}
+                  </span>
                 ) : net < 0 ? (
-                  <span className="font-bold text-coral-dark">owes {formatMoney(-net)}</span>
+                  <span className="shrink-0 rounded-full bg-coral-soft px-3 py-1.5 text-sm font-extrabold text-coral-dark">
+                    owes {formatMoney(-net)}
+                  </span>
                 ) : (
-                  <span className="text-slate-400">settled ✓</span>
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-cream-deep px-3 py-1.5 text-sm font-extrabold text-ink-soft">
+                    <CheckIcon className="h-3.5 w-3.5" /> settled
+                  </span>
                 )}
               </li>
             );
@@ -759,21 +998,45 @@ function MoneyTab({
         </ul>
       </div>
 
-      <div className="rounded-2xl bg-teal p-4 shadow-sm">
-        <h3 className="font-bold text-white">Settle up</h3>
+      {/* Settle up */}
+      <div>
+        <div className="flex items-center gap-2.5 px-1">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber text-teal-deep shadow-amber">
+            <CoinsIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Settle up</h3>
+            <p className="text-xs font-semibold text-ink-soft">Fewest handshakes possible.</p>
+          </div>
+        </div>
         {transfers.length === 0 ? (
-          <p className="mt-1 text-sm text-teal-mist">All square — nobody owes anybody. 🎉</p>
+          <div className="mt-3 overflow-hidden rounded-3xl bg-gradient-to-br from-teal to-teal-light p-5 shadow-teal">
+            <p className="font-display text-lg font-bold text-white">All square 🎉</p>
+            <p className="mt-0.5 text-sm font-semibold text-teal-mist">
+              Nobody owes anybody a cent. Beautiful thing.
+            </p>
+          </div>
         ) : (
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-3 space-y-2.5">
             {transfers.map((t, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 rounded-xl bg-teal-dark px-3 py-2.5">
-                <span className="text-sm text-white">
-                  <b>{nameOf(t.fromId)}</b> pays <b>{nameOf(t.toId)}</b>{" "}
-                  <b className="text-amber">{formatMoney(t.amountCents)}</b>
+              <li key={i} className="card flex items-center gap-2.5 p-4">
+                <Avatar name={nameOf(t.fromId)} size="md" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-display text-[15px] font-bold leading-tight text-ink">
+                    {nameOf(t.fromId)}
+                  </span>
+                  <span className="block text-xs font-bold text-ink-soft">pays {nameOf(t.toId)}</span>
+                </span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-soft text-amber-dark">
+                  <ArrowRightIcon className="h-4 w-4" />
+                </span>
+                <Avatar name={nameOf(t.toId)} size="md" />
+                <span className="ml-1 shrink-0 font-display text-xl font-bold text-teal-dark">
+                  {formatMoney(t.amountCents)}
                 </span>
                 {me && (
                   <button
-                    className="shrink-0 rounded-full bg-amber px-3 py-1.5 text-xs font-bold text-teal-deep"
+                    className="btn-amber shrink-0 px-4 py-2 text-sm"
                     onClick={() =>
                       mutate(
                         `/api/trips/${trip.slug}/payments`,
@@ -791,17 +1054,21 @@ function MoneyTab({
           </ul>
         )}
         {trip.payments.length > 0 && (
-          <div className="mt-3 border-t border-teal-light pt-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-teal-mist">Paid so far</p>
-            <ul className="mt-1 space-y-1 text-sm text-teal-mist">
+          <div className="card mt-3 p-5">
+            <h4 className="text-xs font-extrabold uppercase tracking-[0.18em] text-ink-soft">Paid &amp; settled</h4>
+            <ul className="mt-2.5 space-y-2">
               {trip.payments.map((p) => (
-                <li key={p.id} className="flex items-center justify-between">
-                  <span>
-                    ✓ {nameOf(p.fromId)} paid {nameOf(p.toId)} {formatMoney(p.amountCents)}
+                <li key={p.id} className="flex items-center gap-2.5 text-sm font-semibold text-ink">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-mist text-teal-dark">
+                    <CheckIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {nameOf(p.fromId)} paid {nameOf(p.toId)}{" "}
+                    <b className="text-teal-dark">{formatMoney(p.amountCents)}</b>
                   </span>
                   {me?.isOrganizer && (
                     <button
-                      className="text-xs underline"
+                      className="shrink-0 text-xs font-bold text-ink-soft underline decoration-amber decoration-2 underline-offset-2"
                       onClick={() =>
                         mutate(`/api/trips/${trip.slug}/payments`, "DELETE", { id: p.id, actorId: me.id }, "Payment undone")
                       }
@@ -816,29 +1083,36 @@ function MoneyTab({
         )}
       </div>
 
+      {/* Add expense */}
       {me ? (
-        <form onSubmit={submit} className="rounded-2xl bg-white p-4 shadow-sm">
-          <h3 className="font-bold text-teal-dark">Add an expense</h3>
-          <div className="mt-3 space-y-3">
-            <div className="grid grid-cols-[1fr_110px] gap-3">
-              <input required placeholder="What for? (Greens fees, dinner…)" value={form.description}
+        <form onSubmit={submit} className="card p-5">
+          <h3 className="font-display text-lg font-bold text-teal-dark">Add an expense</h3>
+          <div className="mt-3 space-y-3.5">
+            <div>
+              <label className={labelCls}>What was it for?</label>
+              <input required placeholder="Greens fees, group dinner, the big grocery run…" value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} />
-              <input required inputMode="decimal" placeholder="$0.00" value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>How much?</label>
+                <input required inputMode="decimal" placeholder="$0.00" value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Who covered it?</label>
+                <select value={form.paidBy || me.id} onChange={(e) => setForm({ ...form, paidBy: e.target.value })} className={inputCls}>
+                  {trip.attendees.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                      {a.id === me.id ? " (you)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
-              <label className={labelCls}>Who paid</label>
-              <select value={form.paidBy || me.id} onChange={(e) => setForm({ ...form, paidBy: e.target.value })} className={inputCls}>
-                {trip.attendees.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                    {a.id === me.id ? " (you)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Split among</label>
+              <label className={labelCls}>Split it among</label>
               <div className="flex flex-wrap gap-2">
                 {splitPool.map((a) => {
                   const on = form.splitAmong.includes(a.id);
@@ -854,10 +1128,13 @@ function MoneyTab({
                             : [...form.splitAmong, a.id],
                         })
                       }
-                      className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                        on ? "bg-teal text-white" : "bg-slate-100 text-slate-500"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-display text-sm font-bold transition ${
+                        on
+                          ? "bg-teal text-white shadow-teal"
+                          : "bg-cream-deep text-ink-soft ring-1 ring-cream-edge hover:ring-amber"
                       }`}
                     >
+                      {on && <CheckIcon className="h-3.5 w-3.5" />}
                       {a.name}
                     </button>
                   );
@@ -865,34 +1142,41 @@ function MoneyTab({
               </div>
             </div>
             <button type="submit" disabled={form.splitAmong.length === 0}
-              className="w-full rounded-xl bg-coral py-2.5 font-bold text-white disabled:opacity-50">
+              className="btn-coral w-full py-3">
               Add expense
             </button>
           </div>
         </form>
       ) : (
-        <p className="rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow-sm">Join the trip to add expenses.</p>
+        <div className="card">
+          <EmptyState
+            icon={<CoinsIcon className="h-10 w-10" />}
+            title="Keeping score?"
+            line="Join the trip to log expenses and settle up without a single spreadsheet."
+          />
+        </div>
       )}
 
+      {/* Expense history */}
       {trip.expenses.length > 0 && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <h3 className="font-bold text-teal-dark">Expenses</h3>
-          <ul className="mt-2 divide-y divide-slate-100">
+        <div className="card p-5">
+          <h3 className="font-display text-lg font-bold text-teal-dark">The receipts</h3>
+          <ul className="mt-2 divide-y divide-cream-edge/70">
             {[...trip.expenses]
               .sort((a, b) => b.createdAt - a.createdAt)
               .map((exp: Expense) => (
-                <li key={exp.id} className="flex items-center justify-between py-2.5">
-                  <div>
-                    <div className="font-semibold text-slate-800">{exp.description}</div>
-                    <div className="text-xs text-slate-400">
+                <li key={exp.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-display text-[15px] font-bold text-ink">{exp.description}</div>
+                    <div className="text-xs font-semibold text-ink-soft">
                       {nameOf(exp.paidBy)} paid · split {exp.splitAmong.length} ways
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-slate-700">{formatMoney(exp.amountCents)}</span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="font-display text-base font-bold text-teal-dark">{formatMoney(exp.amountCents)}</span>
                     {me && (me.isOrganizer || exp.createdBy === me.id) && (
                       <button
-                        className="text-xs font-semibold text-coral-dark underline"
+                        className="text-xs font-extrabold text-coral-dark underline decoration-coral/50 underline-offset-2"
                         onClick={() =>
                           mutate(`/api/trips/${trip.slug}/expenses`, "DELETE", { id: exp.id, actorId: me.id }, "Expense deleted")
                         }

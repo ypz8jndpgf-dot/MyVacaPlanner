@@ -3,12 +3,115 @@
 @tailwind utilities;
 
 body {
-  @apply bg-teal-mist text-slate-800 antialiased;
+  @apply bg-cream text-ink antialiased;
+  /* Subtle dotted "route map" texture over the cream canvas */
+  background-image: radial-gradient(rgb(11 85 99 / 0.055) 1.3px, transparent 1.3px);
+  background-size: 22px 22px;
 }
 
-input, select, textarea {
+::selection {
+  background: #f2a93b;
+  color: #052e36;
+}
+
+/* Warm focus treatment for every field */
+input,
+select,
+textarea {
   @apply outline-none;
 }
-input:focus, select:focus, textarea:focus {
-  @apply ring-2 ring-teal-light border-transparent;
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #f2a93b;
+  box-shadow:
+    0 0 0 3px rgb(242 169 59 / 0.35),
+    0 0 0 1px #f2a93b;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgb(242 169 59 / 0.7);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* ---- Friendly form controls ---- */
+  .input-warm {
+    @apply w-full rounded-2xl border-2 border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(11_85_99/0.05)] transition placeholder:font-medium placeholder:text-slate-400;
+  }
+  .label-warm {
+    @apply mb-1.5 block text-[13px] font-extrabold tracking-wide text-teal-dark;
+  }
+
+  /* ---- Buttons ---- */
+  .btn-coral {
+    @apply rounded-full bg-coral font-display font-bold text-white shadow-coral transition duration-200 hover:-translate-y-0.5 hover:bg-coral-dark active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-teal {
+    @apply rounded-full bg-teal font-display font-bold text-white shadow-teal transition duration-200 hover:-translate-y-0.5 hover:bg-teal-light active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-amber {
+    @apply rounded-full bg-amber font-display font-bold text-teal-deep shadow-amber transition duration-200 hover:-translate-y-0.5 hover:bg-amber-dark hover:text-white active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply rounded-full bg-white font-display font-bold text-teal-dark shadow-card ring-1 ring-cream-edge transition duration-200 hover:-translate-y-0.5 hover:ring-amber active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  /* ---- Surfaces ---- */
+  .card {
+    @apply rounded-3xl bg-white shadow-card ring-1 ring-cream-edge/70;
+  }
+
+  /* Boarding-pass perforation: dashed tear line with punched notches.
+     Notch circles use the page cream so they read as cut-outs.
+     --notch = the divider's inset from the card edge + 11px (notch radius);
+     override inline when the divider's horizontal margin differs from 24px. */
+  .ticket-divider {
+    @apply relative border-t-2 border-dashed border-cream-edge;
+    --notch: 35px;
+  }
+  .ticket-divider::before,
+  .ticket-divider::after {
+    content: "";
+    position: absolute;
+    top: -11px;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: #fff9f2;
+  }
+  .ticket-divider::before {
+    left: calc(-1 * var(--notch));
+  }
+  .ticket-divider::after {
+    right: calc(-1 * var(--notch));
+  }
+}
+
+/* Gentle bob for the hero sun */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.animate-bob {
+  animation: bob 5s ease-in-out infinite;
+}
+
+/* Paper plane drifting along the hero route */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(6px, -5px) rotate(4deg);
+  }
+}
+.animate-drift {
+  animation: drift 6s ease-in-out infinite;
 }
