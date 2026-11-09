@@ -4,18 +4,32 @@ import type { Trip } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-/** List trips (summary only). */
+/**
+ * Merged-duplicate stubs (name contains "MERGED", e.g. "… — MERGED into
+ * Rocky Run") are merge debris: their contents live in the canonical trip.
+ * They are hidden from the homepage board so browsing crews don't land in a
+ * stale copy — but NOT deleted, because old invite links are still in
+ * circulation; the stub stays reachable by direct link, and its own name
+ * (rendered as the trip page header) tells visitors it was merged.
+ */
+function isMergedStub(t: Trip): boolean {
+  return /merged/i.test(t.name);
+}
+
+/** List trips (summary only) for the public homepage board. */
 export async function GET() {
   const db = await loadDB();
   return NextResponse.json({
-    trips: db.trips.map((t) => ({
-      slug: t.slug,
-      name: t.name,
-      location: t.location,
-      startDate: t.startDate,
-      endDate: t.endDate,
-      attendeeCount: t.attendees.filter((a) => a.rsvp === "in").length,
-    })),
+    trips: db.trips
+      .filter((t) => !isMergedStub(t))
+      .map((t) => ({
+        slug: t.slug,
+        name: t.name,
+        location: t.location,
+        startDate: t.startDate,
+        endDate: t.endDate,
+        attendeeCount: t.attendees.filter((a) => a.rsvp === "in").length,
+      })),
   });
 }
 
@@ -62,6 +76,9 @@ export async function POST(req: Request) {
       flights: [],
       expenses: [],
       payments: [],
+      shopping: [],
+      polls: [],
+      packing: [],
     };
     db.trips.push(trip);
     return { slug, organizerId };

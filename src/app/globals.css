@@ -37,10 +37,22 @@ a:focus-visible {
 @layer components {
   /* ---- Friendly form controls ---- */
   .input-warm {
-    @apply w-full rounded-2xl border-2 border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(11_85_99/0.05)] transition placeholder:font-medium placeholder:text-slate-400;
+    @apply w-full min-w-0 rounded-2xl border-2 border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(11_85_99/0.05)] transition placeholder:font-medium placeholder:text-slate-400;
   }
   .label-warm {
     @apply mb-1.5 block text-[13px] font-extrabold tracking-wide text-teal-dark;
+  }
+
+  /* Native date/time inputs carry a wide intrinsic minimum size; in a
+     two-column grid that pushed the second field off the card edge on
+     phones. Tighter padding on small screens lets them fit their column. */
+  @media (max-width: 430px) {
+    .input-warm[type="date"],
+    .input-warm[type="time"] {
+      padding-left: 0.55rem;
+      padding-right: 0.55rem;
+      font-size: 0.92rem;
+    }
   }
 
   /* ---- Buttons ---- */

@@ -53,6 +53,9 @@ function seedDB(): DB {
     flights: [],
     expenses: [],
     payments: [],
+    shopping: [],
+    polls: [],
+    packing: [],
   };
   return { trips: [moyapalooza] };
 }
@@ -71,19 +74,29 @@ async function redisLoad(): Promise<DB | null> {
   if (!res.ok) throw new Error(`Redis GET failed: ${res.status}`);
   const data = (await res.json()) as { result: string | null };
   if (!data.result) return null;
-  return JSON.parse(data.result) as DB;
+  let parsed: unknown = JSON.parse(data.result);
+  // Legacy blobs were double-encoded (a JSON string of the DB JSON); unwrap.
+  if (typeof parsed === "string") parsed = JSON.parse(parsed);
+  return parsed as DB;
 }
 
 async function redisSave(db: DB): Promise<void> {
-  const res = await fetch(`${redisUrl}/set/${encodeURIComponent(REDIS_KEY)}`, {
+  // Command-style SET: the value travels as a JSON command argument, so the
+  // stored string is exactly JSON.stringify(db). (The old path-style POST
+  // with a double-stringified body stored the quoted text instead, and every
+  // load parsed back a string rather than the DB — nothing ever persisted.)
+  const res = await fetch(`${redisUrl}/`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${redisToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(JSON.stringify(db)),
+    body: JSON.stringify(["SET", REDIS_KEY, JSON.stringify(db)]),
   });
   if (!res.ok) throw new Error(`Redis SET failed: ${res.status}`);
+  const data = (await res.json()) as { result?: string; error?: string };
+  if (data.error || data.result !== "OK")
+    throw new Error(`Redis SET failed: ${data.error ?? "unexpected result"}`);
 }
 
 async function fileLoad(): Promise<DB | null> {
@@ -121,7 +134,21 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 
 export async function loadDB(): Promise<DB> {
   const db = useRedis ? await redisLoad() : await fileLoad();
-  if (db && Array.isArray(db.trips)) return db;
+  if (db && Array.isArray(db.trips)) {
+    // Normalize older trips so missing collections (e.g. shopping, added
+    // later) default to empty arrays instead of crashing consumers.
+    for (const t of db.trips) {
+      if (!Array.isArray(t.attendees)) t.attendees = [];
+      if (!Array.isArray(t.schedule)) t.schedule = [];
+      if (!Array.isArray(t.flights)) t.flights = [];
+      if (!Array.isArray(t.expenses)) t.expenses = [];
+      if (!Array.isArray(t.payments)) t.payments = [];
+      if (!Array.isArray(t.shopping)) t.shopping = [];
+      if (!Array.isArray(t.polls)) t.polls = [];
+      if (!Array.isArray(t.packing)) t.packing = [];
+    }
+    return db;
+  }
   const seeded = seedDB();
   await saveDB(seeded);
   return seeded;

@@ -6,6 +6,9 @@ export interface Attendee {
   rsvp: Rsvp;
   isOrganizer: boolean;
   createdAt: number;
+  /** Optional payment handles (no @ / $ prefix) for one-tap settle-up links. */
+  venmo?: string;
+  cashapp?: string;
 }
 
 export interface ScheduleItem {
@@ -47,6 +50,45 @@ export interface Expense {
   createdAt: number;
 }
 
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  quantity?: string;
+  note?: string;
+  checked: boolean;
+  checkedBy?: string; // attendee id
+  createdBy: string; // attendee id
+  createdAt: number;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: string[]; // attendee ids; one vote per attendee per poll
+}
+
+export interface Poll {
+  id: string;
+  question: string;
+  options: PollOption[];
+  closed: boolean;
+  createdBy: string; // attendee id
+  createdAt: number;
+}
+
+/** A shared to-bring / packing item: like a shopping item, plus who brings it. */
+export interface PackingItem {
+  id: string;
+  name: string;
+  quantity?: string;
+  note?: string;
+  assignedTo?: string; // attendee id who'll bring it
+  checked: boolean; // packed / handled
+  checkedBy?: string; // attendee id
+  createdBy: string; // attendee id
+  createdAt: number;
+}
+
 /** A recorded settle-up transfer (someone actually paid someone back). */
 export interface Payment {
   id: string;
@@ -68,10 +110,15 @@ export interface Trip {
   flights: Flight[];
   expenses: Expense[];
   payments: Payment[];
+  shopping: ShoppingItem[];
+  polls: Poll[];
+  packing: PackingItem[];
 }
 
 export interface DB {
   trips: Trip[];
+  /** Geocode cache: query string -> coordinates (Nominatim results). */
+  geo?: Record<string, { lat: number; lon: number }>;
 }
 
 export interface Transfer {

@@ -37,7 +37,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   return NextResponse.json(result, { status: 201 });
 }
 
-/** Change RSVP / rename. Self or organizer. */
+/** Sanitize a payment handle: returns the cleaned handle, null to clear, or
+ *  undefined when the value is absent/invalid (leave unchanged). */
+function cleanHandle(v: unknown, kind: "venmo" | "cashapp"): string | null | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().replace(/^[@$]+/, "");
+  if (s === "") return null;
+  const ok = kind === "venmo" ? /^[A-Za-z0-9_-]{3,30}$/.test(s) : /^[A-Za-z0-9_]{1,20}$/.test(s);
+  return ok ? s : undefined;
+}
+
+/** Change RSVP / rename / payment handles. Self or organizer. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const body = (await req.json().catch(() => null)) as {
@@ -45,6 +55,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     actorId?: string;
     rsvp?: Rsvp;
     name?: string;
+    venmo?: string;
+    cashapp?: string;
   } | null;
   if (!body?.id || !body.actorId)
     return NextResponse.json({ error: "id and actorId are required" }, { status: 400 });
@@ -59,6 +71,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     if (!target) return null;
     if (body.rsvp) target.rsvp = body.rsvp;
     if (body.name?.trim()) target.name = body.name.trim();
+    const venmo = cleanHandle(body.venmo, "venmo");
+    if (venmo === null) delete target.venmo;
+    else if (venmo !== undefined) target.venmo = venmo;
+    const cashapp = cleanHandle(body.cashapp, "cashapp");
+    if (cashapp === null) delete target.cashapp;
+    else if (cashapp !== undefined) target.cashapp = cashapp;
     return { trip };
   });
 

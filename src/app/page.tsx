@@ -10,6 +10,7 @@ import {
   CoinsIcon,
   PaperPlaneIcon,
   PinIcon,
+  mapsUrl,
   PlaneIcon,
   SunIcon,
   UsersIcon,
@@ -27,7 +28,6 @@ interface TripSummary {
 export default function HomePage() {
   const router = useRouter();
   const [trips, setTrips] = useState<TripSummary[]>([]);
-  const [mySlugs, setMySlugs] = useState<string[]>([]);
   const [form, setForm] = useState({ name: "", location: "", startDate: "", endDate: "", organizerName: "" });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -37,9 +37,6 @@ export default function HomePage() {
       .then((r) => r.json())
       .then((d) => setTrips(d.trips ?? []))
       .catch(() => {});
-    try {
-      setMySlugs(JSON.parse(localStorage.getItem("mvp:trips") ?? "[]"));
-    } catch {}
   }, []);
 
   async function createTrip(e: React.FormEvent) {
@@ -64,10 +61,28 @@ export default function HomePage() {
   }
 
   const featured = trips.find((t) => t.slug === "moyapalooza-2027");
-  const mine = trips.filter((t) => mySlugs.includes(t.slug) && t.slug !== featured?.slug);
+  const others = trips
+    .filter((t) => t.slug !== featured?.slug)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   return (
     <main className="pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            name: "MyVacaPlanner",
+            url: "https://myvacaplanner.com",
+            applicationCategory: "TravelApplication",
+            operatingSystem: "Web",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            description:
+              "Group trip planner in one shareable link: invites and RSVP, a shared schedule, flight arrivals, crew polls, local events, and expenses split and settled. No accounts or app install.",
+          }),
+        }}
+      />
       {/* ------- Hero: gradient sky, sun, dotted route ------- */}
       <section className="relative overflow-hidden bg-gradient-to-b from-teal-deep via-teal to-teal-light">
         {/* sun glow */}
@@ -187,9 +202,15 @@ export default function HomePage() {
                 </div>
               </div>
               {featured.location && (
-                <div className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-teal">
+                <a
+                  href={mapsUrl(featured.location)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-teal underline decoration-dotted underline-offset-2"
+                >
                   <PinIcon className="h-4 w-4 text-coral" /> {featured.location}
-                </div>
+                </a>
               )}
             </div>
             <div className="ticket-divider mx-6" />
@@ -202,13 +223,13 @@ export default function HomePage() {
           </button>
         )}
 
-        {/* ------- Your trips ------- */}
-        {mine.length > 0 && (
+        {/* ------- All trips ------- */}
+        {others.length > 0 && (
           <section className="card p-5">
-            <h2 className="font-display text-lg font-bold text-teal-dark">Your trips</h2>
-            <p className="text-sm font-medium text-ink-soft">Jump back in — your crew missed you.</p>
+            <h2 className="font-display text-lg font-bold text-teal-dark">Trips on the board</h2>
+            <p className="text-sm font-medium text-ink-soft">Every trip crews are planning right now — tap one to jump in.</p>
             <ul className="mt-3 space-y-2">
-              {mine.map((t) => (
+              {others.map((t) => (
                 <li key={t.slug}>
                   <button
                     onClick={() => router.push(`/t/${t.slug}`)}
@@ -222,6 +243,7 @@ export default function HomePage() {
                       <span className="block text-xs font-semibold text-ink-soft">
                         {formatDate(t.startDate)} – {formatDate(t.endDate)}
                         {t.location ? ` · ${t.location}` : ""}
+                        {t.attendeeCount > 0 ? ` · ${t.attendeeCount} in the crew` : ""}
                       </span>
                     </span>
                     <ArrowRightIcon className="h-4 w-4 shrink-0 text-coral" />
@@ -271,7 +293,7 @@ export default function HomePage() {
                 className="input-warm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
               <div>
                 <label className="label-warm" htmlFor="trip-start">Touchdown day</label>
                 <input

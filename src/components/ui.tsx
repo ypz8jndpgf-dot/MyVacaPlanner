@@ -70,6 +70,11 @@ export function PinIcon({ className = "h-4 w-4" }: IconProps) {
   );
 }
 
+/** Google Maps search URL for a free-text place/address. */
+export function mapsUrl(query: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 export function SunIcon({ className = "h-5 w-5" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className={className} aria-hidden>
