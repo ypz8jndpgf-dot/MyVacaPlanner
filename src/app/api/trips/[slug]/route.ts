@@ -22,11 +22,24 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
   } | null;
   if (!body?.actorId) return NextResponse.json({ error: "actorId required" }, { status: 400 });
 
+  // Destination and dates stay mandatory on edit too — they can't be blanked.
+  if (body.location !== undefined && !body.location.trim())
+    return NextResponse.json({ error: "Destination can't be blank" }, { status: 400 });
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  if (
+    (body.startDate && !DATE_RE.test(body.startDate)) ||
+    (body.endDate && !DATE_RE.test(body.endDate))
+  )
+    return NextResponse.json({ error: "Dates must be YYYY-MM-DD" }, { status: 400 });
+
   const updated = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
     const actor = trip.attendees.find((a) => a.id === body.actorId);
     if (!actor?.isOrganizer) return "forbidden" as const;
+    const nextStart = body.startDate ?? trip.startDate;
+    const nextEnd = body.endDate ?? trip.endDate;
+    if (nextEnd < nextStart) return "bad_dates" as const;
     if (body.name?.trim()) trip.name = body.name.trim();
     if (body.location !== undefined) trip.location = body.location.trim();
     if (body.startDate) trip.startDate = body.startDate;
@@ -37,5 +50,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
   if (!updated) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   if (updated === "forbidden")
     return NextResponse.json({ error: "Only the organizer can edit trip details" }, { status: 403 });
+  if (updated === "bad_dates")
+    return NextResponse.json({ error: "End date must be on or after start date" }, { status: 400 });
   return NextResponse.json({ trip: updated });
 }

@@ -258,7 +258,7 @@ export default function HomePage() {
         <section className="card p-6">
           <h2 className="font-display text-2xl font-bold text-teal-dark">Start a new adventure</h2>
           <p className="mt-1 text-sm font-medium text-ink-soft">
-            Name it, date it, share the link — that&apos;s the whole setup. Your crew does the rest.
+            Name it, place it, date it, share the link — that&apos;s the whole setup. Your crew does the rest.
           </p>
           <form onSubmit={createTrip} className="mt-5 space-y-4">
             <div>
@@ -284,9 +284,10 @@ export default function HomePage() {
               />
             </div>
             <div>
-              <label className="label-warm" htmlFor="trip-location">Where to? <span className="font-semibold text-ink-soft">(optional)</span></label>
+              <label className="label-warm" htmlFor="trip-location">Where to?</label>
               <input
                 id="trip-location"
+                required
                 placeholder="e.g. Scottsdale, AZ"
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}

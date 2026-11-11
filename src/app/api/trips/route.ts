@@ -42,11 +42,24 @@ export async function POST(req: Request) {
     endDate?: string;
     organizerName?: string;
   } | null;
-  if (!body?.name?.trim() || !body.startDate || !body.endDate || !body.organizerName?.trim()) {
+  // Destination ("endpoint") and both dates are mandatory (user directive
+  // 2026-11-10): a trip without a place has no weather, events, activities
+  // or map — the whole Rocky Run standard keys off them.
+  if (
+    !body?.name?.trim() ||
+    !body.location?.trim() ||
+    !body.startDate ||
+    !body.endDate ||
+    !body.organizerName?.trim()
+  ) {
     return NextResponse.json(
-      { error: "name, startDate, endDate and organizerName are required" },
+      { error: "name, destination, startDate, endDate and organizerName are required" },
       { status: 400 }
     );
+  }
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  if (!DATE_RE.test(body.startDate) || !DATE_RE.test(body.endDate)) {
+    return NextResponse.json({ error: "startDate and endDate must be YYYY-MM-DD" }, { status: 400 });
   }
   if (body.endDate < body.startDate) {
     return NextResponse.json({ error: "endDate must be on or after startDate" }, { status: 400 });
@@ -59,7 +72,7 @@ export async function POST(req: Request) {
     const trip: Trip = {
       slug,
       name: body.name!.trim(),
-      location: (body.location ?? "").trim(),
+      location: body.location!.trim(),
       startDate: body.startDate!,
       endDate: body.endDate!,
       createdAt: Date.now(),
