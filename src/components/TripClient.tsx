@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { Attendee, Expense, Flight, PackingItem, Poll, Rsvp, ScheduleItem, ShoppingItem, Trip } from "@/lib/types";
+import type { Attendee, Expense, Flight, LodgingInfo, PackingItem, Poll, Rsvp, ScheduleItem, ShoppingItem, Trip } from "@/lib/types";
 import { computeBalances, dateRange, formatDate, formatMoney, formatTime, settleUp } from "@/lib/logic";
 import {
   ArrowRightIcon,
@@ -14,6 +14,7 @@ import {
   ClockIcon,
   CoinsIcon,
   EmptyState,
+  HomeIcon,
   PinIcon,
   mapsUrl,
   PlaneIcon,
@@ -23,7 +24,7 @@ import {
   UsersIcon,
 } from "@/components/ui";
 
-type Tab = "crew" | "schedule" | "flights" | "money";
+type Tab = "crew" | "schedule" | "flights" | "money" | "stay";
 
 const inputCls = "input-warm";
 const labelCls = "label-warm";
@@ -183,11 +184,12 @@ export default function TripClient({ slug }: { slug: string }) {
           </div>
         )}
 
-        <nav className="relative mt-4 grid grid-cols-4 gap-1 rounded-full bg-teal-deep/80 p-1 text-center shadow-inner">
+        <nav className="relative mt-4 grid grid-cols-5 gap-1 rounded-full bg-teal-deep/80 p-1 text-center shadow-inner">
           {(
             [
               ["schedule", "Plan", CalendarIcon],
               ["flights", "Flights", PlaneIcon],
+              ["stay", "Stay", HomeIcon],
               ["money", "Money", CoinsIcon],
               ["crew", "Crew", UsersIcon],
             ] as [Tab, string, React.ComponentType<{ className?: string }>][]
@@ -228,6 +230,7 @@ export default function TripClient({ slug }: { slug: string }) {
       )}
       {tab === "schedule" && <ScheduleTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
       {tab === "flights" && <FlightsTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
+      {tab === "stay" && <LodgingTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
       {tab === "money" && <MoneyTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
 
       {toast && (
@@ -849,6 +852,193 @@ function ScheduleTab({
 
 
 /* ---------------- Flights ---------------- */
+
+function LodgingTab({
+  trip,
+  me,
+  nameOf,
+  mutate,
+}: {
+  trip: Trip;
+  me?: Attendee;
+  nameOf: (id: string) => string;
+  mutate: Mutate;
+}) {
+  const lodging = trip.lodging;
+  const empty: LodgingInfo = {
+    name: "",
+    address: "",
+    checkIn: "",
+    checkOut: "",
+    accessCode: "",
+    wifi: "",
+    contact: "",
+    url: "",
+    notes: "",
+  };
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<LodgingInfo>(empty);
+
+  function startEdit() {
+    setForm({ ...empty, ...(lodging ?? {}) });
+    setEditing(true);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    await mutate(`/api/trips/${trip.slug}/lodging`, "PATCH", { actorId: me!.id, ...form }, "Stay saved");
+    setEditing(false);
+  }
+
+  const rows: [string, string | undefined][] = lodging
+    ? [
+        ["Check-in", lodging.checkIn],
+        ["Check-out", lodging.checkOut],
+        ["Door code", lodging.accessCode],
+        ["Wi-Fi", lodging.wifi],
+        ["Host / contact", lodging.contact],
+      ]
+    : [];
+
+  return (
+    <section className="mt-5">
+      <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-bold text-ink">
+        <HomeIcon className="h-5 w-5 text-coral" /> Where we&rsquo;re staying
+      </h2>
+
+      {editing && me ? (
+        <form onSubmit={save} className="space-y-3 rounded-2xl bg-cream-deep/60 px-4 py-4 ring-1 ring-cream-edge/50">
+          <div>
+            <label className={labelCls}>Stay name — Airbnb, hotel, …</label>
+            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Airbnb" />
+          </div>
+          <div>
+            <label className={labelCls}>Address</label>
+            <input value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} className={inputCls} placeholder="123 Main St, Philadelphia, PA" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Check-in</label>
+              <input value={form.checkIn ?? ""} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} className={inputCls} placeholder="Fri 3pm" />
+            </div>
+            <div>
+              <label className={labelCls}>Check-out</label>
+              <input value={form.checkOut ?? ""} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} className={inputCls} placeholder="Mon 11am" />
+            </div>
+            <div>
+              <label className={labelCls}>Door / gate code</label>
+              <input value={form.accessCode ?? ""} onChange={(e) => setForm({ ...form, accessCode: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Wi-Fi</label>
+              <input value={form.wifi ?? ""} onChange={(e) => setForm({ ...form, wifi: e.target.value })} className={inputCls} placeholder="Network · password" />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Host / contact</label>
+            <input value={form.contact ?? ""} onChange={(e) => setForm({ ...form, contact: e.target.value })} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Listing / booking link</label>
+            <input value={form.url ?? ""} onChange={(e) => setForm({ ...form, url: e.target.value })} className={inputCls} placeholder="https://www.airbnb.com/rooms/…" />
+          </div>
+          <div>
+            <label className={labelCls}>Notes (parking, house rules, …)</label>
+            <input value={form.notes ?? ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputCls} />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="btn-teal flex-1 py-2.5">
+              Save stay
+            </button>
+            <button type="button" className="btn-ghost px-5" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+          {lodging && (
+            <button
+              type="button"
+              className="w-full text-center text-xs font-bold text-coral-dark underline decoration-dotted underline-offset-2"
+              onClick={async () => {
+                await mutate(`/api/trips/${trip.slug}/lodging`, "PATCH", { actorId: me!.id, clear: true }, "Stay removed");
+                setEditing(false);
+              }}
+            >
+              Remove this stay
+            </button>
+          )}
+        </form>
+      ) : lodging ? (
+        <div className="rounded-2xl bg-cream-deep/60 px-4 py-4 ring-1 ring-cream-edge/50">
+          <div className="flex items-start justify-between gap-2">
+            <div className="font-display text-xl font-bold text-ink">{lodging.name}</div>
+            {me && (
+              <button
+                className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+                onClick={startEdit}
+              >
+                edit
+              </button>
+            )}
+          </div>
+          {lodging.address && (
+            <div className="mt-1.5 flex items-center gap-1 text-sm font-semibold text-ink-soft">
+              <PinIcon className="h-3.5 w-3.5 shrink-0 text-coral" />
+              <a
+                href={mapsUrl(
+                  trip.location && !lodging.address.toLowerCase().includes(trip.location.toLowerCase())
+                    ? `${lodging.address}, ${trip.location}`
+                    : lodging.address
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-dotted underline-offset-2"
+              >
+                {lodging.address}
+              </a>
+            </div>
+          )}
+          <dl className="mt-3 space-y-1.5">
+            {rows
+              .filter(([, v]) => v)
+              .map(([k, v]) => (
+                <div key={k} className="flex gap-2 text-sm">
+                  <dt className="w-28 shrink-0 font-extrabold text-ink">{k}</dt>
+                  <dd className="font-medium text-ink-soft">{v}</dd>
+                </div>
+              ))}
+          </dl>
+          {lodging.url && (
+            <a
+              href={lodging.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+            >
+              View the listing <ArrowRightIcon className="h-3.5 w-3.5" />
+            </a>
+          )}
+          {lodging.notes && <p className="mt-3 text-sm font-medium text-ink-soft">{lodging.notes}</p>}
+          {lodging.updatedBy && (
+            <p className="mt-3 text-xs font-semibold text-ink-soft/70">Saved by {nameOf(lodging.updatedBy)}</p>
+          )}
+        </div>
+      ) : (
+        <div>
+          <EmptyState
+            icon={<HomeIcon className="h-8 w-8" />}
+            title="No stay saved yet"
+            line="Whoever booked the Airbnb or hotel can drop the address, door code, and check-in details here so the whole crew has them."
+          />
+          {me && (
+            <button className="btn-teal mt-3 w-full py-2.5" onClick={startEdit}>
+              + Add the stay
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
 function FlightsTab({
   trip,

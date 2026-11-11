@@ -98,10 +98,31 @@ export interface Payment {
   createdAt: number;
 }
 
+/** Where the crew is staying — one stay per trip, editable by any attendee. */
+export interface LodgingInfo {
+  /** "Airbnb", a hotel name, "Mom's house"… */
+  name: string;
+  address?: string;
+  /** Free text, e.g. "Fri 3pm" / "Mon 11am". */
+  checkIn?: string;
+  checkOut?: string;
+  /** Door / gate / lockbox code. */
+  accessCode?: string;
+  wifi?: string;
+  /** Host or front-desk contact. */
+  contact?: string;
+  /** Listing / booking link (Airbnb, hotel, …). */
+  url?: string;
+  notes?: string;
+  updatedBy?: string;
+  updatedAt?: number;
+}
+
 export interface Trip {
   slug: string;
   name: string;
   location: string;
+  lodging?: LodgingInfo;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   createdAt: number;
