@@ -299,9 +299,9 @@ function JoinCard({
 
   return (
     <section className="card mt-5 overflow-hidden p-0 shadow-lift">
-      <div className="bg-gradient-to-r from-amber to-[#F8BE60] px-5 py-4">
-        <h2 className="font-display text-xl font-bold text-teal-deep">You&apos;re invited to {tripName} 🎉</h2>
-        <p className="mt-0.5 text-sm font-bold text-teal-deep/70">
+      <div className="bg-teal-deep px-5 py-4">
+        <h2 className="font-display text-xl font-bold text-white">You&apos;re invited to {tripName} 🎉</h2>
+        <p className="mt-0.5 text-sm font-bold text-teal-mist/80">
           No account, no fuss — just claim your spot on the crew list.
         </p>
       </div>
@@ -315,7 +315,7 @@ function JoinCard({
                   key={a.id}
                   disabled={busy}
                   onClick={() => join(a.rsvp, a.name)}
-                  className="inline-flex items-center gap-2 rounded-full bg-cream-deep py-1 pl-1 pr-3.5 font-display text-sm font-bold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:-translate-y-0.5 hover:ring-amber disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-cream-deep py-1 pl-1 pr-3.5 font-display text-sm font-bold text-teal-dark shadow-sm ring-1 ring-cream-edge transition  hover:ring-amber disabled:opacity-50"
                 >
                   <Avatar name={a.name} size="sm" />
                   {a.name}

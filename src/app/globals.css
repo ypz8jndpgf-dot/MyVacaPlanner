@@ -4,9 +4,8 @@
 
 body {
   @apply bg-cream text-ink antialiased;
-  /* Subtle dotted "route map" texture over the cream canvas */
-  background-image: radial-gradient(rgb(11 85 99 / 0.055) 1.3px, transparent 1.3px);
-  background-size: 22px 22px;
+  /* Sleek pass (2026-11-11): the dotted route-map texture is gone —
+   * the canvas is clean soft white. */
 }
 
 ::selection {
@@ -37,7 +36,7 @@ a:focus-visible {
 @layer components {
   /* ---- Friendly form controls ---- */
   .input-warm {
-    @apply w-full min-w-0 rounded-2xl border-2 border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(11_85_99/0.05)] transition placeholder:font-medium placeholder:text-slate-400;
+    @apply w-full min-w-0 rounded-xl border border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(20_27_31/0.04)] transition placeholder:font-medium placeholder:text-slate-400;
   }
   .label-warm {
     @apply mb-1.5 block text-[13px] font-extrabold tracking-wide text-teal-dark;
@@ -56,22 +55,24 @@ a:focus-visible {
   }
 
   /* ---- Buttons ---- */
+  /* Sleek pass: the primary action is near-black ink (coral is demoted
+   * to small accents), and buttons no longer bounce on hover. */
   .btn-coral {
-    @apply rounded-full bg-coral font-display font-bold text-white shadow-coral transition duration-200 hover:-translate-y-0.5 hover:bg-coral-dark active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-ink font-display font-bold text-white shadow-coral transition duration-200 hover:bg-teal-dark disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-teal {
-    @apply rounded-full bg-teal font-display font-bold text-white shadow-teal transition duration-200 hover:-translate-y-0.5 hover:bg-teal-light active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-teal font-display font-bold text-white shadow-teal transition duration-200 hover:bg-teal-light disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-amber {
-    @apply rounded-full bg-amber font-display font-bold text-teal-deep shadow-amber transition duration-200 hover:-translate-y-0.5 hover:bg-amber-dark hover:text-white active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-amber font-display font-bold text-teal-deep shadow-amber transition duration-200 hover:bg-amber-dark hover:text-white disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-ghost {
-    @apply rounded-full bg-white font-display font-bold text-teal-dark shadow-card ring-1 ring-cream-edge transition duration-200 hover:-translate-y-0.5 hover:ring-amber active:translate-y-0 disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-white font-display font-bold text-teal-dark shadow-card ring-1 ring-cream-edge transition duration-200 hover:ring-amber disabled:pointer-events-none disabled:opacity-50;
   }
 
   /* ---- Surfaces ---- */
   .card {
-    @apply rounded-3xl bg-white shadow-card ring-1 ring-cream-edge/70;
+    @apply rounded-2xl bg-white shadow-card ring-1 ring-cream-edge/70;
   }
 
   /* Boarding-pass perforation: dashed tear line with punched notches.
@@ -79,7 +80,7 @@ a:focus-visible {
      --notch = the divider's inset from the card edge + 11px (notch radius);
      override inline when the divider's horizontal margin differs from 24px. */
   .ticket-divider {
-    @apply relative border-t-2 border-dashed border-cream-edge;
+    @apply relative border-t border-dashed border-cream-edge;
     --notch: 35px;
   }
   .ticket-divider::before,
@@ -90,7 +91,7 @@ a:focus-visible {
     width: 22px;
     height: 22px;
     border-radius: 9999px;
-    background: #fff9f2;
+    background: #f7f7f4;
   }
   .ticket-divider::before {
     left: calc(-1 * var(--notch));

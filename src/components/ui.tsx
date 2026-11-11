@@ -130,15 +130,17 @@ export function ClockIcon({ className = "h-4 w-4" }: IconProps) {
 
 /* ---- Avatars ---- */
 
+/* Sleek pass (2026-11-11): the candy-bright palette is muted to deep,
+ * desaturated tones — same eight-way spread, grown-up register. */
 const PERSON_COLORS: { bg: string; fg: string }[] = [
-  { bg: "#FF6B5E", fg: "#FFFFFF" }, // coral
-  { bg: "#F2A93B", fg: "#3D2B00" }, // amber
-  { bg: "#0E6B7A", fg: "#FFFFFF" }, // teal light
-  { bg: "#2A9D8F", fg: "#FFFFFF" }, // lagoon
-  { bg: "#E8833A", fg: "#FFFFFF" }, // tangerine
-  { bg: "#E9C46A", fg: "#4A3800" }, // sunny gold
+  { bg: "#C4503F", fg: "#FFFFFF" }, // muted coral
+  { bg: "#B9852F", fg: "#FFFFFF" }, // ochre
+  { bg: "#2F6F79", fg: "#FFFFFF" }, // teal
+  { bg: "#3E7A72", fg: "#FFFFFF" }, // lagoon
+  { bg: "#A96A44", fg: "#FFFFFF" }, // clay
+  { bg: "#8F8148", fg: "#FFFFFF" }, // olive gold
   { bg: "#0B5563", fg: "#FFFFFF" }, // deep teal
-  { bg: "#D96C4F", fg: "#FFFFFF" }, // terracotta
+  { bg: "#54677A", fg: "#FFFFFF" }, // slate
 ];
 
 export function personColor(name: string): { bg: string; fg: string } {

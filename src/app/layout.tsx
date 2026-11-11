@@ -1,17 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Baloo_2, Nunito } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const display = Baloo_2({
+/* Sleek pass (2026-11-11): one geometric family throughout — Manrope —
+ * replacing the rounded Baloo 2 / Nunito pairing. Display and body share
+ * the family; headings separate by weight and tight tracking alone. */
+const display = Manrope({
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  weight: ["600", "700", "800"],
   variable: "--font-display",
   display: "swap",
 });
 
-const sans = Nunito({
+const sans = Manrope({
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
   display: "swap",
 });

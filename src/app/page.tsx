@@ -88,7 +88,7 @@ export default function HomePage() {
         {/* sun glow */}
         <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-amber/25 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 top-40 h-56 w-56 rounded-full bg-coral/20 blur-3xl" />
-        <SunIcon className="animate-bob absolute right-6 top-8 h-14 w-14 text-amber" />
+        <SunIcon className="absolute right-6 top-8 h-14 w-14 text-amber" />
         {/* dotted flight route */}
         <svg
           viewBox="0 0 600 120"
@@ -105,7 +105,7 @@ export default function HomePage() {
             strokeDasharray="0.1 11"
           />
         </svg>
-        <PaperPlaneIcon className="animate-drift absolute right-[16%] top-[5.7rem] h-6 w-6 rotate-12 text-amber" />
+        <PaperPlaneIcon className="absolute right-[16%] top-[5.7rem] h-6 w-6 rotate-12 text-amber" />
 
         <div className="relative mx-auto max-w-xl px-4 pb-28 pt-12 text-center">
           {/* logo lockup */}
@@ -115,7 +115,7 @@ export default function HomePage() {
               alt="MyVacaPlanner"
               width={104}
               height={104}
-              className="rounded-[1.9rem] shadow-lift ring-4 ring-white/25"
+              className="rounded-[1.4rem] shadow-lift ring-4 ring-white/25"
             />
             <div className="mt-4 font-display text-[2rem] font-bold leading-none tracking-tight text-white">
               My<span className="text-amber">Vaca</span>Planner
@@ -158,7 +158,7 @@ export default function HomePage() {
           className="absolute bottom-0 left-0 h-12 w-full sm:h-16"
           aria-hidden
         >
-          <path d="M0,50 C240,92 480,2 720,34 C960,66 1200,90 1440,42 L1440,90 L0,90 Z" fill="#FFF9F2" />
+          <path d="M0,50 C240,92 480,2 720,34 C960,66 1200,90 1440,42 L1440,90 L0,90 Z" fill="#F7F7F4" />
         </svg>
       </section>
 
@@ -167,7 +167,7 @@ export default function HomePage() {
         {featured && (
           <button
             onClick={() => router.push(`/t/${featured.slug}`)}
-            className="card group block w-full p-0 text-left shadow-lift transition duration-200 hover:-translate-y-1"
+            className="card group block w-full p-0 text-left shadow-lift transition duration-200 "
           >
             <div className="px-6 pb-5 pt-5">
               <div className="flex items-center justify-between">
@@ -233,7 +233,7 @@ export default function HomePage() {
                 <li key={t.slug}>
                   <button
                     onClick={() => router.push(`/t/${t.slug}`)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-cream-deep/70 px-4 py-3 text-left ring-1 ring-cream-edge/60 transition hover:-translate-y-0.5 hover:bg-cream-deep hover:shadow-card"
+                    className="flex w-full items-center gap-3 rounded-2xl bg-cream-deep/70 px-4 py-3 text-left ring-1 ring-cream-edge/60 transition  hover:bg-cream-deep hover:shadow-card"
                   >
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white font-display text-lg font-bold text-coral shadow-sm">
                       {t.name.slice(0, 1).toUpperCase()}
