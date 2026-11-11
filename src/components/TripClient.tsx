@@ -886,7 +886,7 @@ function LodgingTab({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    await mutate(`/api/trips/${trip.slug}/lodging`, "PATCH", { actorId: me!.id, ...form }, "Stay saved");
+    await mutate(`/api/trips/${trip.slug}/lodging`, "PATCH", { actorId: me?.id, ...form }, "Stay saved");
     setEditing(false);
   }
 
@@ -906,7 +906,7 @@ function LodgingTab({
         <HomeIcon className="h-5 w-5 text-coral" /> Where we&rsquo;re staying
       </h2>
 
-      {editing && me ? (
+      {editing ? (
         <form onSubmit={save} className="space-y-3 rounded-2xl bg-cream-deep/60 px-4 py-4 ring-1 ring-cream-edge/50">
           <div>
             <label className={labelCls}>Stay name — Airbnb, hotel, …</label>
@@ -959,7 +959,7 @@ function LodgingTab({
               type="button"
               className="w-full text-center text-xs font-bold text-coral-dark underline decoration-dotted underline-offset-2"
               onClick={async () => {
-                await mutate(`/api/trips/${trip.slug}/lodging`, "PATCH", { actorId: me!.id, clear: true }, "Stay removed");
+                await mutate(`/api/trips/${trip.slug}/lodging`, "PATCH", { actorId: me?.id, clear: true }, "Stay removed");
                 setEditing(false);
               }}
             >
@@ -971,14 +971,12 @@ function LodgingTab({
         <div className="rounded-2xl bg-cream-deep/60 px-4 py-4 ring-1 ring-cream-edge/50">
           <div className="flex items-start justify-between gap-2">
             <div className="font-display text-xl font-bold text-ink">{lodging.name}</div>
-            {me && (
-              <button
-                className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
-                onClick={startEdit}
-              >
-                edit
-              </button>
-            )}
+            <button
+              className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+              onClick={startEdit}
+            >
+              edit
+            </button>
           </div>
           {lodging.address && (
             <div className="mt-1.5 flex items-center gap-1 text-sm font-semibold text-ink-soft">
@@ -1029,11 +1027,9 @@ function LodgingTab({
             title="No stay saved yet"
             line="Whoever booked the Airbnb or hotel can drop the address, door code, and check-in details here so the whole crew has them."
           />
-          {me && (
-            <button className="btn-teal mt-3 w-full py-2.5" onClick={startEdit}>
-              + Add the stay
-            </button>
-          )}
+          <button className="btn-teal mt-3 w-full py-2.5" onClick={startEdit}>
+            + Add the stay
+          </button>
         </div>
       )}
     </section>
