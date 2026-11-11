@@ -1832,7 +1832,7 @@ interface MapPoint {
   sub?: string;
   lat: number;
   lon: number;
-  kind: "event" | "plan";
+  kind: "event" | "plan" | "stay";
 }
 
 function escapeHtml(s: string): string {
@@ -1873,7 +1873,7 @@ function MapSection({ trip }: { trip: Trip }) {
       }).addTo(map);
       const bounds: [number, number][] = [];
       for (const p of data.points) {
-        const color = p.kind === "event" ? "#E8503F" : "#0B5563";
+        const color = p.kind === "event" ? "#E8503F" : p.kind === "stay" ? "#E8A33D" : "#0B5563";
         const marker = L.circleMarker([p.lat, p.lon], {
           radius: 9,
           color: "#ffffff",
@@ -1910,7 +1910,8 @@ function MapSection({ trip }: { trip: Trip }) {
   if (data.points.length === 0) return null;
 
   const planCount = data.points.filter((p) => p.kind === "plan").length;
-  const venueCount = data.points.length - planCount;
+  const venueCount = data.points.filter((p) => p.kind === "event").length;
+  const stayCount = data.points.filter((p) => p.kind === "stay").length;
 
   return (
     <div className="mt-7">
@@ -1921,9 +1922,13 @@ function MapSection({ trip }: { trip: Trip }) {
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Trip map</h3>
           <p className="text-xs font-semibold text-ink-soft">
-            {venueCount > 0 && `${venueCount} event venue${venueCount === 1 ? "" : "s"}`}
-            {venueCount > 0 && planCount > 0 && " · "}
-            {planCount > 0 && `${planCount} plan spot${planCount === 1 ? "" : "s"}`}
+            {[
+              venueCount > 0 ? `${venueCount} event venue${venueCount === 1 ? "" : "s"}` : null,
+              planCount > 0 ? `${planCount} plan spot${planCount === 1 ? "" : "s"}` : null,
+              stayCount > 0 ? "home base" : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             {" — tap a pin for directions"}
           </p>
         </div>
@@ -1936,6 +1941,9 @@ function MapSection({ trip }: { trip: Trip }) {
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-teal-deep ring-2 ring-white" /> Plan spots
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber ring-2 ring-white" /> Home base
           </span>
         </div>
       </div>

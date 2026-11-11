@@ -9,7 +9,7 @@ export interface MapPoint {
   sub?: string;
   lat: number;
   lon: number;
-  kind: "event" | "plan";
+  kind: "event" | "plan" | "stay";
 }
 
 /**
@@ -115,6 +115,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
     if (planSeen.has(dedupeKey)) continue;
     planSeen.add(dedupeKey);
     points.push({ label: item.location, sub: item.title, lat: coords.lat, lon: coords.lon, kind: "plan" });
+  }
+
+  // --- The stay (home base pin) ---
+  if (trip.lodging?.address?.trim()) {
+    const coords = await resolvePlace(trip.lodging.address);
+    if (coords) {
+      points.push({
+        label: trip.lodging.name || "Where we're staying",
+        sub: trip.lodging.address,
+        lat: coords.lat,
+        lon: coords.lon,
+        kind: "stay",
+      });
+    }
   }
 
   if (Object.keys(fresh).length > 0) {

@@ -42,6 +42,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     "washington dc": "Washington",
     chi: "Chicago",
     beantown: "Boston",
+    // Kissimmee is the Orlando vacation-home corridor — same catalog.
+    kissimmee: "Orlando",
   };
   const city = CITY_ALIASES[parts[0].toLowerCase()] ?? parts[0];
 
