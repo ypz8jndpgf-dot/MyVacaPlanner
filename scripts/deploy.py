@@ -4,7 +4,7 @@ from dynamic_credentials import add_surrogate_to_request, read_json_response
 
 ROOT = "/home/hatch/workspace/myvacaplanner"
 PROJECT = "prj_jh5vczYkFZgMjYlBrqO9nM8PVAAH"
-SKIP_DIRS = {".git", "node_modules", ".next", "data"}
+SKIP_DIRS = {".git", "node_modules", ".next", "data", "backups"}
 SKIP_FILES = {"tsconfig.tsbuildinfo"}
 
 files = []

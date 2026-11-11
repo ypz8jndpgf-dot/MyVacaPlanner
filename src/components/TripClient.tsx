@@ -786,6 +786,7 @@ function ScheduleTab({
   return (
     <section className="mt-5">
       <EventsStrip trip={trip} me={me} mutate={mutate} />
+      <ActivitiesStrip trip={trip} me={me} mutate={mutate} />
       <MapSection trip={trip} />
       <PollsSection trip={trip} me={me} nameOf={nameOf} mutate={mutate} />
       <div className="mb-4 flex justify-end">
@@ -1855,6 +1856,109 @@ function EventsStrip({ trip, me, mutate }: { trip: Trip; me?: Attendee; mutate: 
           </article>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Activities strip (Viator affiliate) ---------------- */
+
+interface TripActivity {
+  id: string;
+  title: string;
+  blurb: string;
+  meta: string;
+  priceNote?: string;
+  emoji: string;
+  url: string;
+}
+
+function ActivitiesStrip({ trip, me, mutate }: { trip: Trip; me?: Attendee; mutate: Mutate }) {
+  const [data, setData] = useState<{ city: string; browseUrl: string; activities: TripActivity[] } | null>(null);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/trips/${trip.slug}/activities`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (live && d.enabled && Array.isArray(d.activities) && d.activities.length > 0) setData(d);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [trip.slug]);
+
+  if (!data) return null;
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center gap-2.5 px-1">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal text-lg text-white shadow-teal">🧭</span>
+        <div>
+          <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Things to do in {data.city}</h3>
+          <p className="text-xs font-semibold text-ink-soft">Bookable tours &amp; activities, hand-picked for this trip.</p>
+        </div>
+      </div>
+      <div className="mt-3 space-y-2.5">
+        {data.activities.map((a) => (
+          <article key={a.id} className="card flex items-center gap-3 p-3.5">
+            <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-teal-mist text-3xl">{a.emoji}</span>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-[15px] font-bold leading-tight text-ink">{a.title}</div>
+              <p className="mt-0.5 text-xs font-semibold leading-snug text-ink-soft">{a.blurb}</p>
+              <div className="mt-0.5 truncate text-xs font-bold text-ink-soft">
+                {a.meta}
+                {a.priceNote ? ` · ${a.priceNote}` : ""}
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <a
+                  href={a.url}
+                  target="_blank"
+                  rel="sponsored noopener noreferrer"
+                  className="rounded-full bg-amber-soft px-2.5 py-1 text-[11px] font-extrabold text-amber-dark ring-1 ring-amber/40 transition hover:ring-amber"
+                >
+                  Book on Viator ↗
+                </a>
+                {me &&
+                  (added.has(a.id) ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-mist px-2.5 py-1 text-[11px] font-extrabold text-teal-dark">
+                      <CheckIcon className="h-3 w-3" /> In the plan
+                    </span>
+                  ) : (
+                    <button
+                      className="rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+                      onClick={async () => {
+                        await mutate(
+                          `/api/trips/${trip.slug}/schedule`,
+                          "POST",
+                          {
+                            actorId: me.id,
+                            title: a.title,
+                            date: trip.startDate,
+                            time: "",
+                            location: data.city,
+                            notes: `Book on Viator: ${a.url}`,
+                          },
+                          "Added to the plan"
+                        );
+                        setAdded((s) => new Set(s).add(a.id));
+                      }}
+                    >
+                      + Add to plan
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="mt-2.5 px-1 text-[11px] font-semibold text-ink-soft">
+        <a href={data.browseUrl} target="_blank" rel="sponsored noopener noreferrer" className="font-extrabold text-teal-dark underline decoration-amber decoration-2 underline-offset-2">
+          Browse everything to do in {data.city} on Viator ↗
+        </a>{" "}
+        · Booking through these links may earn MyVacaPlanner a commission, at no extra cost to you.
+      </p>
     </div>
   );
 }
