@@ -36,21 +36,34 @@ async function sendPassAnnouncement(g: {
   const key = process.env.MVP_RESEND_API_KEY;
   if (!key || g.emails.length === 0) return;
   const url = `https://myvacaplanner.com/t/${g.slug}`;
-  const subject = `⭐ ${g.name} just went Premium`;
-  const text = `${g.byName} upgraded "${g.name}" with the Organizer Pass — this trip just went Premium!\n\nNow unlocked:\n• Paid-up tracking for every split\n• A group fund for the big shared costs\n• Pinned announcements\n• A lockable itinerary\n\nSee the trip: ${url}\n\n— MyVacaPlanner (trip updates only; reply STOP to opt out)`;
-  const html = `<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:8px">
-  <div style="background:linear-gradient(135deg,#0b5563,#128091);border-radius:20px;padding:28px 24px;color:#ffffff">
-    <div style="font-size:22px;font-weight:800">⭐ ${g.name} just went Premium</div>
-    <p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:#d7f0ee">${g.byName} upgraded this trip with the <b>Organizer Pass</b> — here's what the whole crew just unlocked:</p>
-    <div style="margin-top:14px">
-      <span style="display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;margin:0 4px 6px 0">✓ Paid-up tracking</span>
-      <span style="display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;margin:0 4px 6px 0">✓ Group fund</span>
-      <span style="display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;margin:0 4px 6px 0">✓ Co-organizers</span>
-      <span style="display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;margin:0 4px 6px 0">✓ Itinerary lock</span>
+  const subject = `⭐ ${g.name} just went PREMIUM`;
+  const text = `🎉 ${g.name} JUST WENT PREMIUM 🎉\n\n${g.byName} leveled up this trip with the Organizer Pass — and the whole crew rides in style now.\n\nHere's what Premium unlocked for everyone:\n\n💸 PAID-UP TRACKING — No more "wait, did you pay?" in the group chat. Every split shows who's in, who's paid, and who's up next.\n🏦 GROUP FUND — One pot for the big stuff: the house, the boat day, the private chef.\n📣 PINNED ANNOUNCEMENTS — The important stuff stays at the top — not buried under 400 messages.\n🔒 ITINERARY LOCK — Once the plan is set, it stays set. No 2am surprises.\n\nPremium trips run smoother. Yours just did. 🌴\n\nSee your Premium trip: ${url}\n\n— MyVacaPlanner (trip updates only, never marketing; reply STOP to opt out)`;
+  const benefit = (emoji: string, title: string, copy: string) =>
+    `<tr><td style="padding:7px 10px 7px 0;vertical-align:top;font-size:20px">${emoji}</td><td style="padding:7px 0;vertical-align:top"><div style="font-size:15px;font-weight:800;color:#0d2b33">${title}</div><div style="font-size:14px;line-height:1.45;color:#3d5a63">${copy}</div></td></tr>`;
+  const html = `<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#fdf6e9;padding:18px 10px">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:22px;overflow:hidden;box-shadow:0 6px 28px rgba(13,43,51,.14)">
+    <img src="https://myvacaplanner.com/email-hero.jpg" alt="Your crew on the trip of a lifetime" width="560" style="display:block;width:100%;max-width:560px;height:auto" />
+    <div style="background:#07333c;padding:24px 26px 20px">
+      <div style="font-size:25px;font-weight:900;line-height:1.2;color:#ffffff">⭐ ${g.name} just went PREMIUM</div>
+      <div style="margin-top:6px;font-size:15px;font-weight:700;color:#ffcf5c">${g.byName} leveled up this trip — the whole crew rides in style now 🎉</div>
     </div>
-    <a href="${url}" style="display:inline-block;margin-top:18px;background:#f5b93f;color:#3a2a00;font-weight:800;font-size:15px;text-decoration:none;padding:12px 22px;border-radius:999px">Open the trip →</a>
+    <div style="padding:20px 26px 6px">
+      <p style="margin:0;font-size:16px;line-height:1.55;color:#17323a">The Organizer Pass is <b>on</b>. Here's what Premium unlocked for <b>everyone</b> on this trip:</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:10px">
+        ${benefit("💸", "Paid-up tracking", "No more “wait, did you pay?” in the group chat. Every split shows who's in, who's paid, and who's up next.")}
+        ${benefit("🏦", "Group fund", "One pot for the big stuff — the house, the boat day, the private chef.")}
+        ${benefit("📣", "Pinned announcements", "The important stuff stays at the top — not buried under 400 messages.")}
+        ${benefit("🔒", "Itinerary lock", "Once the plan is set, it stays set. No 2am surprises.")}
+      </table>
+      <div style="text-align:center;padding:16px 0 6px">
+        <a href="${url}" style="display:inline-block;background:#f5b93f;color:#3a2a00;font-weight:900;font-size:16px;text-decoration:none;padding:14px 30px;border-radius:999px">See your Premium trip →</a>
+      </div>
+      <p style="text-align:center;font-size:14px;font-weight:700;color:#0d5563;margin:8px 0 2px">Premium trips run smoother. Yours just did. 🌴</p>
+    </div>
+    <div style="padding:12px 26px 20px">
+      <p style="color:#93a1a8;font-size:12px;text-align:center;margin:0">MyVacaPlanner · trip updates only, never marketing · reply STOP to opt out</p>
+    </div>
   </div>
-  <p style="color:#8a94a0;font-size:12px;text-align:center;margin-top:14px">MyVacaPlanner · trip updates only, never marketing · reply STOP to opt out</p>
 </div>`;
   await Promise.all(
     g.emails.map(async (to) => {
