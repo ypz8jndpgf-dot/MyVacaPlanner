@@ -86,6 +86,17 @@ export async function POST(req: Request) {
           byName: session.metadata?.buyerName?.trim() || "Organizer",
           stripeSessionId: session.id ?? "stripe",
         };
+        // The upgrade announces itself: pin the celebratory announcement
+        // every crew member sees at the top of the Plan tab. Only when the
+        // organizer hasn't already pinned one of their own.
+        if (!trip.announcement) {
+          trip.announcement = {
+            text: `⭐ ${trip.pass.byName} upgraded this trip with the Organizer Pass — this trip just went Premium! Now unlocked: paid-up tracking for every split, a group fund for the big shared costs, pinned announcements like this one, and a lockable itinerary. 🎉`,
+            byName: trip.pass.byName,
+            at: Date.now(),
+            auto: "pass-upgrade",
+          };
+        }
       }).catch((e: Error) => {
         console.error("mvp webhook: granting pass failed", e);
       });

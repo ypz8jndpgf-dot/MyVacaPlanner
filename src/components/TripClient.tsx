@@ -1062,7 +1062,31 @@ function ScheduleTab({
 
   return (
     <section className="mt-5">
-      {passActive && trip.announcement && (
+      {passActive && trip.announcement?.auto === "pass-upgrade" && (
+        <div className="relative mb-4 overflow-hidden rounded-3xl bg-gradient-to-br from-teal-deep via-teal to-teal-light p-5 shadow-teal">
+          <p className="font-display text-lg font-extrabold tracking-tight text-white">
+            ⭐ This trip just went Premium
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-snug text-teal-mist">
+            {trip.announcement.text}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {["Paid-up tracking", "Group fund", "Co-organizers", "Itinerary lock"].map((f) => (
+              <span
+                key={f}
+                className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-extrabold text-white ring-1 ring-white/25"
+              >
+                ✓ {f}
+              </span>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] font-semibold text-teal-mist/80">
+            {trip.announcement.byName} ·{" "}
+            {new Date(trip.announcement.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </p>
+        </div>
+      )}
+      {passActive && trip.announcement && trip.announcement.auto !== "pass-upgrade" && (
         <div className="card mb-4 border-l-4 border-l-amber p-4">
           <div className="flex items-start gap-2.5">
             <span className="text-lg leading-none">📣</span>

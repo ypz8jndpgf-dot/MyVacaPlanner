@@ -84,6 +84,10 @@ export interface TripAnnouncement {
   text: string;
   byName: string;
   at: number;
+  /** Set only on the automatic pass-upgrade announcement the Stripe webhook
+   *  pins when a pass is granted; renders as the Premium banner instead of
+   *  the plain card. Organizer-written announcements never carry it. */
+  auto?: "pass-upgrade";
 }
 
 export interface ShoppingItem {
