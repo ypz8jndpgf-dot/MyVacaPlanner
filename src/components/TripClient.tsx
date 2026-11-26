@@ -1,11 +1,10 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { Attendee, Expense, Flight, LodgingInfo, PackingItem, Poll, Rsvp, ScheduleItem, ShoppingItem, Trip } from "@/lib/types";
-import { computeBalances, dateRange, formatDate, formatMoney, formatTime, settleUp } from "@/lib/logic";
+import type { Attendee, Expense, Flight, LodgingInfo, PackingItem, Poll, Rsvp, ScheduleItem, SharePayment, SharePaymentMethod, ShoppingItem, Trip } from "@/lib/types";
+import { computeBalances, dateRange, formatDate, formatMoney, formatTime, organizerIds, settleUp, shareCentsFor } from "@/lib/logic";
 import {
   ArrowRightIcon,
   Avatar,
@@ -13,10 +12,13 @@ import {
   CheckIcon,
   ClockIcon,
   CoinsIcon,
+  contactsPickerAvailable,
+  coverGradient,
   EmptyState,
   HomeIcon,
   PinIcon,
   mapsUrl,
+  pickContactNames,
   PlaneIcon,
   PlaneLandIcon,
   PlaneTakeoffIcon,
@@ -46,6 +48,10 @@ export default function TripClient({ slug }: { slug: string }) {
   const [meId, setMeId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("schedule");
   const [toast, setToast] = useState("");
+  // Organizer Pass feature switch (server env MVP_PASS_ENABLED, surfaced
+  // via /api/config). While false, no pass UI renders anywhere — the
+  // trip experience is exactly the pre-pass one.
+  const [passOn, setPassOn] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -60,6 +66,13 @@ export default function TripClient({ slug }: { slug: string }) {
     load();
     setMeId(localStorage.getItem(`mvp:me:${slug}`));
   }, [load, slug]);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((d) => setPassOn(Boolean(d?.passEnabled)))
+      .catch(() => {});
+  }, []);
 
   const me: Attendee | undefined = trip?.attendees.find((a) => a.id === meId);
   const nameOf = useCallback(
@@ -114,7 +127,7 @@ export default function TripClient({ slug }: { slug: string }) {
           height={80}
           className="mx-auto animate-pulse rounded-[1.6rem] shadow-card"
         />
-        <p className="mt-5 font-display text-lg font-bold text-teal-dark">Unpacking your trip…</p>
+        <p className="mt-5 font-display text-xl font-extrabold tracking-tight text-teal-dark">Unpacking your trip…</p>
       </main>
     );
   }
@@ -123,12 +136,36 @@ export default function TripClient({ slug }: { slug: string }) {
   const crewStack = [...trip.attendees].sort(
     (a, b) => ({ in: 0, maybe: 1, out: 2 })[a.rsvp] - ({ in: 0, maybe: 1, out: 2 })[b.rsvp]
   );
+  const organizer = trip.attendees.find((a) => a.isOrganizer);
+  const tabs = (
+    [
+      ["schedule", "Plan", CalendarIcon],
+      ["flights", "Flights", PlaneIcon],
+      ["stay", "Stay", HomeIcon],
+      ["money", "Money", CoinsIcon],
+      ["crew", "Crew", UsersIcon],
+    ] as [Tab, string, React.ComponentType<{ className?: string }>][]
+  ).map(([key, label, Icon]) => (
+    <button
+      key={key}
+      onClick={() => setTab(key)}
+      aria-current={tab === key ? "page" : undefined}
+      className={`flex flex-col items-center justify-center gap-0.5 rounded-full py-2 text-[11px] font-extrabold transition duration-200 sm:flex-row sm:gap-1.5 sm:text-[13px] ${
+        tab === key ? "bg-teal-deep text-white shadow-md" : "text-ink-soft hover:text-teal-dark"
+      }`}
+    >
+      <Icon className="h-5 w-5 sm:h-4 sm:w-4" />
+      {label}
+    </button>
+  ));
 
   return (
-    <main className="mx-auto max-w-xl px-4 pb-24">
-      {/* ------- Header ------- */}
-      <header className="sticky top-0 z-20 -mx-4 overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-teal-deep via-teal to-teal-light px-4 pb-4 pt-4 shadow-lift">
-        <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-amber/20 blur-2xl" />
+    <main className="mx-auto max-w-xl px-4 pb-28">
+      {/* ------- Cover header ------- */}
+      <header
+        className={`relative -mx-4 overflow-hidden bg-gradient-to-br ${coverGradient(trip.slug)} px-4 pb-6 pt-5 shadow-lift`}
+      >
+        <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex items-center gap-3">
           <Image
             src="/logo.webp"
@@ -138,13 +175,21 @@ export default function TripClient({ slug }: { slug: string }) {
             className="rounded-2xl shadow-md ring-2 ring-white/30"
           />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-[22px] font-bold leading-tight text-white">{trip.name}</h1>
-            <p className="truncate text-xs font-bold text-teal-mist/90">MyVacaPlanner trip HQ</p>
+            <div className="truncate text-xs font-bold text-white/75">MyVacaPlanner trip HQ</div>
+            {organizer && (
+              <div className="truncate text-xs font-bold text-white/75">
+                Organized by {organizer.name}
+              </div>
+            )}
           </div>
           <ShareButton slug={slug} />
         </div>
 
-        <div className="relative mt-3 flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold text-white">
+        <h1 className="relative mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white">
+          {trip.name}
+        </h1>
+
+        <div className="relative mt-4 flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold text-white">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 ring-1 ring-white/20">
             <CalendarIcon className="h-3.5 w-3.5" />
             {formatDate(trip.startDate)} – {formatDate(trip.endDate)}
@@ -162,59 +207,59 @@ export default function TripClient({ slug }: { slug: string }) {
           )}
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 ring-1 ring-white/20">
             <UsersIcon className="h-3.5 w-3.5" />
-            {inCount} in
+            {inCount} in · {trip.attendees.length} in the crew
           </span>
+          {passOn && trip.pass && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1.5 text-teal-deep ring-1 ring-white/30">
+              ⭐ Organizer Pass
+            </span>
+          )}
+          {passOn && !trip.pass && me?.isOrganizer && (
+            <PassHeaderButton slug={trip.slug} actorId={me.id} />
+          )}
         </div>
 
         {crewStack.length > 0 && (
-          <div className="relative mt-3 flex items-center">
+          <div className="relative mt-4 flex items-center">
             <div className="flex -space-x-2">
               {crewStack.slice(0, 6).map((a) => (
-                <Avatar key={a.id} name={a.name} size="sm" className="ring-2 ring-teal" />
+                <Avatar key={a.id} name={a.name} size="sm" className="ring-2 ring-white/40" />
               ))}
               {crewStack.length > 6 && (
-                <span className="z-10 flex h-8 w-8 items-center justify-center rounded-full bg-amber font-display text-xs font-bold text-teal-deep ring-2 ring-teal">
+                <span className="z-10 flex h-8 w-8 items-center justify-center rounded-full bg-amber font-display text-xs font-bold text-teal-deep ring-2 ring-white/40">
                   +{crewStack.length - 6}
                 </span>
               )}
             </div>
-            <span className="ml-3 text-xs font-bold text-teal-mist">
+            <span className="ml-3 text-xs font-bold text-white/85">
               {crewStack.length === 1 ? "Just getting started" : "The crew so far"}
             </span>
           </div>
         )}
-
-        <nav className="relative mt-4 grid grid-cols-5 gap-1 rounded-full bg-teal-deep/80 p-1 text-center shadow-inner">
-          {(
-            [
-              ["schedule", "Plan", CalendarIcon],
-              ["flights", "Flights", PlaneIcon],
-              ["stay", "Stay", HomeIcon],
-              ["money", "Money", CoinsIcon],
-              ["crew", "Crew", UsersIcon],
-            ] as [Tab, string, React.ComponentType<{ className?: string }>][]
-          ).map(([key, label, Icon]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`flex items-center justify-center gap-1.5 rounded-full py-2 text-[13px] font-extrabold transition duration-200 ${
-                tab === key ? "bg-white text-teal-dark shadow-md" : "text-teal-mist hover:text-white"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
-        </nav>
       </header>
 
-      <WeatherStrip slug={slug} />
+      {/* ------- Sticky glass tab bar (desktop) ------- */}
+      <nav className="sticky top-3 z-20 mt-4 hidden sm:block">
+        <div className="glass grid grid-cols-5 gap-1 rounded-full p-1.5 text-center">{tabs}</div>
+      </nav>
+
+      {/* ------- Bottom tab bar (mobile) ------- */}
+      <nav className="fixed inset-x-0 bottom-0 z-20 sm:hidden">
+        <div className="glass mx-3 mb-[max(0.75rem,env(safe-area-inset-bottom))] grid grid-cols-5 gap-1 rounded-full px-2 py-1.5">
+          {tabs}
+        </div>
+      </nav>
+
+      <WeatherStrip key={`${trip.startDate}:${trip.endDate}`} slug={slug} />
+
+      {me && me.isOrganizer && <TripDetailsEditor trip={trip} me={me} mutate={mutate} />}
 
       {!me && (
         <JoinCard
           slug={slug}
           tripName={trip.name}
           attendees={trip.attendees}
+          onAdded={load}
           onJoined={(attendee) => {
             localStorage.setItem(`mvp:me:${slug}`, attendee.id);
             const mine: string[] = JSON.parse(localStorage.getItem("mvp:trips") ?? "[]");
@@ -225,16 +270,18 @@ export default function TripClient({ slug }: { slug: string }) {
         />
       )}
 
-      {tab === "crew" && (
-        <CrewTab trip={trip} me={me} mutate={mutate} setMeId={setMeId} slug={slug} />
-      )}
-      {tab === "schedule" && <ScheduleTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
-      {tab === "flights" && <FlightsTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
-      {tab === "stay" && <LodgingTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
-      {tab === "money" && <MoneyTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
+      <div key={tab} className="tab-fade">
+        {tab === "crew" && (
+          <CrewTab trip={trip} me={me} mutate={mutate} setMeId={setMeId} slug={slug} passOn={passOn} orgIds={organizerIds(trip)} />
+        )}
+        {tab === "schedule" && <ScheduleTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} passOn={passOn} orgIds={organizerIds(trip)} />}
+        {tab === "flights" && <FlightsTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
+        {tab === "stay" && <LodgingTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} />}
+        {tab === "money" && <MoneyTab trip={trip} me={me} nameOf={nameOf} mutate={mutate} passOn={passOn} orgIds={organizerIds(trip)} />}
+      </div>
 
       {toast && (
-        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-center gap-2 rounded-full bg-teal-deep px-4 py-3 text-center text-sm font-bold text-white shadow-lift">
+        <div className="fixed bottom-24 left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-center gap-2 rounded-full bg-teal-deep px-4 py-3 text-center text-sm font-bold text-white shadow-lift sm:bottom-[max(1.25rem,env(safe-area-inset-bottom))]">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber text-teal-deep">
             <CheckIcon className="h-3 w-3" />
           </span>
@@ -273,15 +320,24 @@ function JoinCard({
   tripName,
   attendees,
   onJoined,
+  onAdded,
 }: {
   slug: string;
   tripName: string;
   attendees: Attendee[];
   onJoined: (a: Attendee) => void;
+  onAdded?: () => void;
 }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [addedNote, setAddedNote] = useState("");
+  // Contact Picker API exists only on some phones (Android Chrome, Safari
+  // with a flag) — the button renders only where it can actually work.
+  const [contactsOk, setContactsOk] = useState(false);
+  useEffect(() => {
+    setContactsOk(contactsPickerAvailable());
+  }, []);
 
   async function join(rsvp: Rsvp, joinName: string) {
     if (!joinName.trim()) return;
@@ -297,11 +353,50 @@ function JoinCard({
     }
   }
 
+  /** Add picked contacts as crew ("in"), through the same attendees POST
+   *  the manual join uses. Names already on the list are skipped (the API
+   *  dedupes by name too, but skipping here keeps the count honest). */
+  async function addFromContacts() {
+    setError("");
+    setAddedNote("");
+    let names: string[] = [];
+    try {
+      names = await pickContactNames(true);
+    } catch {
+      return; // picker dismissed — nothing to do
+    }
+    if (names.length === 0) return;
+    const onList = new Set(attendees.map((a) => a.name.trim().toLowerCase()));
+    const seen = new Set<string>();
+    const fresh = names.filter((n) => {
+      const key = n.toLowerCase();
+      if (onList.has(key) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (fresh.length === 0) {
+      setAddedNote("Those names are already on the list ✓");
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const n of fresh) {
+        await api(`/api/trips/${slug}/attendees`, "POST", { name: n, rsvp: "in" });
+      }
+      setAddedNote(`Added ${fresh.length} ${fresh.length === 1 ? "name" : "names"} from your contacts ✓`);
+      onAdded?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add from contacts");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="card mt-5 overflow-hidden p-0 shadow-lift">
-      <div className="bg-teal-deep px-5 py-4">
-        <h2 className="font-display text-xl font-bold text-white">You&apos;re invited to {tripName} 🎉</h2>
-        <p className="mt-0.5 text-sm font-bold text-teal-mist/80">
+      <div className="bg-gradient-to-br from-teal-deep via-teal to-teal-light px-6 py-5">
+        <h2 className="font-display text-2xl font-extrabold tracking-tight text-white">You&apos;re invited to {tripName} 🎉</h2>
+        <p className="mt-1 text-sm font-bold text-teal-mist/90">
           No account, no fuss — just claim your spot on the crew list.
         </p>
       </div>
@@ -336,6 +431,16 @@ function JoinCard({
           onChange={(e) => setName(e.target.value)}
           className={inputCls}
         />
+        {contactsOk && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={addFromContacts}
+            className="btn-ghost mt-2.5 w-full py-2.5 text-sm"
+          >
+            📇 Add from contacts
+          </button>
+        )}
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             disabled={busy || !name.trim()}
@@ -352,11 +457,141 @@ function JoinCard({
             Can&apos;t make it
           </button>
         </div>
+        {addedNote && (
+          <p className="mt-3 rounded-2xl bg-teal-mist px-4 py-2.5 text-sm font-bold text-teal-dark">{addedNote}</p>
+        )}
         {error && (
           <p className="mt-3 rounded-2xl bg-coral-soft px-4 py-2.5 text-sm font-bold text-coral-dark">{error}</p>
         )}
       </div>
     </section>
+  );
+}
+
+/** Organizer-only trip details editor: name, destination, and dates.
+ *  Uses the trip PATCH endpoint (organizer-gated server-side too). */
+function TripDetailsEditor({ trip, me, mutate }: { trip: Trip; me: Attendee; mutate: Mutate }) {
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    name: trip.name,
+    location: trip.location ?? "",
+    startDate: trip.startDate,
+    endDate: trip.endDate,
+  });
+
+  function startEdit() {
+    setForm({
+      name: trip.name,
+      location: trip.location ?? "",
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+    });
+    setError("");
+    setEditing(true);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.location.trim()) {
+      setError("Name and destination can't be blank.");
+      return;
+    }
+    if (form.endDate < form.startDate) {
+      setError("End date must be on or after the start date.");
+      return;
+    }
+    setError("");
+    await mutate(
+      `/api/trips/${trip.slug}`,
+      "PATCH",
+      {
+        actorId: me.id,
+        name: form.name.trim(),
+        location: form.location.trim(),
+        startDate: form.startDate,
+        endDate: form.endDate,
+      },
+      "Trip details saved"
+    );
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <div className="card mt-5 flex items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <div className="font-display text-[15px] font-bold text-teal-dark">✏️ Trip details</div>
+          <div className="truncate text-xs font-semibold text-ink-soft">
+            {formatDate(trip.startDate)} – {formatDate(trip.endDate)}
+            {trip.location ? ` · ${trip.location}` : ""}
+          </div>
+        </div>
+        <button
+          className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+          onClick={startEdit}
+        >
+          edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={save} className="card mt-5 space-y-3 p-5">
+      <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">✏️ Trip details</h3>
+      <div>
+        <label className={labelCls}>What&rsquo;s the trip called?</label>
+        <input
+          required
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className={inputCls}
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Where to?</label>
+        <input
+          required
+          value={form.location}
+          onChange={(e) => setForm({ ...form, location: e.target.value })}
+          className={inputCls}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+        <div>
+          <label className={labelCls}>Touchdown day</label>
+          <input
+            type="date"
+            required
+            value={form.startDate}
+            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+            className={inputCls}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Heading home</label>
+          <input
+            type="date"
+            required
+            value={form.endDate}
+            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+            className={inputCls}
+          />
+        </div>
+      </div>
+      {error && (
+        <p className="rounded-2xl bg-coral-soft px-4 py-2.5 text-sm font-bold text-coral-dark">{error}</p>
+      )}
+      <div className="flex gap-2">
+        <button type="submit" className="btn-teal flex-1 py-2.5">
+          Save details
+        </button>
+        <button type="button" className="btn-ghost px-5" onClick={() => setEditing(false)}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -447,12 +682,16 @@ function CrewTab({
   mutate,
   setMeId,
   slug,
+  passOn,
+  orgIds,
 }: {
   trip: Trip;
   me?: Attendee;
   mutate: Mutate;
   setMeId: (id: string | null) => void;
   slug: string;
+  passOn: boolean;
+  orgIds: string[];
 }) {
   const groups: { key: Rsvp; title: string; emoji: string }[] = [
     { key: "in", title: "In", emoji: "🙌" },
@@ -464,14 +703,14 @@ function CrewTab({
     <section className="mt-5 space-y-4">
       <div className="card p-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold text-teal-dark">The crew</h2>
+          <h2 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">The crew</h2>
           <span className="rounded-full bg-amber-soft px-3 py-1 font-display text-sm font-bold text-amber-dark">
             {inCount} in
           </span>
         </div>
 
         {me && (
-          <div className="mt-4 rounded-3xl bg-cream-deep/70 p-3.5 ring-1 ring-cream-edge/60">
+          <div className="mt-4 rounded-[20px] bg-cream p-4 ring-1 ring-cream-edge/60">
             <div className="flex items-center gap-3">
               <Avatar name={me.name} size="md" />
               <div className="min-w-0 flex-1">
@@ -532,7 +771,7 @@ function CrewTab({
                 {people.map((a) => (
                   <li
                     key={a.id}
-                    className="flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-cream/70"
+                    className="flex items-center gap-3 rounded-[20px] bg-white px-3 py-2.5 ring-1 ring-cream-edge/50"
                   >
                     <Avatar name={a.name} size="md" />
                     <span className="min-w-0 flex-1">
@@ -551,6 +790,11 @@ function CrewTab({
                     {a.isOrganizer && (
                       <span className="shrink-0 rounded-full bg-amber-soft px-2.5 py-1 text-[11px] font-extrabold text-amber-dark">
                         ★ organizer
+                      </span>
+                    )}
+                    {!a.isOrganizer && passOn && trip.pass && orgIds.includes(a.id) && (
+                      <span className="shrink-0 rounded-full bg-teal-mist px-2.5 py-1 text-[11px] font-extrabold text-teal-dark">
+                        ★ co-organizer
                       </span>
                     )}
                     {me?.isOrganizer && !a.isOrganizer && (
@@ -584,12 +828,19 @@ function ScheduleTab({
   me,
   nameOf,
   mutate,
+  passOn,
+  orgIds,
 }: {
   trip: Trip;
   me?: Attendee;
   nameOf: (id: string) => string;
   mutate: Mutate;
+  passOn: boolean;
+  orgIds: string[];
 }) {
+  const passActive = passOn && Boolean(trip.pass);
+  const locked = passActive && Boolean(trip.itineraryLocked);
+  const iAmOrg = me ? orgIds.includes(me.id) : false;
   const [form, setForm] = useState({ title: "", date: trip.startDate, time: "", location: "", notes: "" });
   const [editing, setEditing] = useState<ScheduleItem | null>(null);
   const [editForm, setEditForm] = useState({ title: "", date: "", time: "", location: "", notes: "" });
@@ -640,18 +891,18 @@ function ScheduleTab({
     const items = byDay.get(day) ?? [];
     const dayIndex = days.indexOf(day);
     return (
-      <div key={day} className="flex gap-3">
+      <div key={day} className="flex gap-3.5">
         {/* timeline rail */}
         <div className="flex w-10 shrink-0 flex-col items-center">
-          <span className="z-10 flex h-10 w-10 items-center justify-center rounded-full bg-amber-soft text-amber-dark shadow-sm ring-4 ring-cream">
+          <span className="z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-teal shadow-sm ring-1 ring-cream-edge">
             <SunIcon className="h-5 w-5" />
           </span>
-          {!isLast && <span className="my-1 w-0 flex-1 border-l-2 border-dashed border-teal/25" />}
+          {!isLast && <span className="my-1 w-px flex-1 bg-cream-edge" />}
         </div>
         {/* day card */}
-        <div className="card mb-4 min-w-0 flex-1 p-4">
+        <div className="card mb-5 min-w-0 flex-1 p-5">
           <div className="flex items-baseline justify-between gap-2">
-            <h3 className="font-display text-lg font-bold text-teal-dark">{formatDate(day)}</h3>
+            <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">{formatDate(day)}</h3>
             {dayIndex >= 0 && (
               <span className="shrink-0 rounded-full bg-teal-mist px-2.5 py-0.5 text-[11px] font-extrabold text-teal-dark">
                 Day {dayIndex + 1}
@@ -664,8 +915,11 @@ function ScheduleTab({
             </div>
           ) : (
             <ul className="mt-2.5 space-y-2">
-              {items.map((item) =>
-                editing?.id === item.id ? (
+              {items.map((item) => {
+                // Run-sheet items (titled "📋 Run Sheet …") get a distinct
+                // amber treatment so the day's master sheet stands out.
+                const isRunSheet = item.title.includes("Run Sheet");
+                return editing?.id === item.id ? (
                   <li key={item.id} className="rounded-2xl bg-white px-3.5 py-3 ring-2 ring-amber">
                     <form onSubmit={submitEdit} className="space-y-2.5">
                       <div>
@@ -726,10 +980,22 @@ function ScheduleTab({
                     </form>
                   </li>
                 ) : (
-                  <li key={item.id} className="rounded-2xl bg-cream-deep/60 px-3.5 py-3 ring-1 ring-cream-edge/50">
+                  <li
+                    key={item.id}
+                    className={`rounded-[20px] px-4 py-3.5 ring-1 ${
+                      isRunSheet
+                        ? "bg-amber-soft/60 ring-amber/50"
+                        : "bg-cream-deep/50 ring-cream-edge/50"
+                    }`}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
+                          {isRunSheet && (
+                            <span className="rounded-full bg-amber px-2 py-0.5 text-[11px] font-extrabold text-teal-deep">
+                              📋 Run sheet
+                            </span>
+                          )}
                           {item.time && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-extrabold text-teal-dark shadow-sm">
                               <ClockIcon className="h-3.5 w-3.5 text-coral" />
@@ -757,7 +1023,7 @@ function ScheduleTab({
                         )}
                         {item.notes && <div className="mt-0.5 text-sm font-medium text-ink-soft">{item.notes}</div>}
                       </div>
-                      {me && (me.isOrganizer || item.createdBy === me.id) && (
+                      {me && (locked ? iAmOrg : me.isOrganizer || item.createdBy === me.id) && (
                         <span className="flex shrink-0 gap-1.5 text-[11px] font-extrabold">
                           <button
                             className="rounded-full bg-white px-2.5 py-1 text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
@@ -777,8 +1043,8 @@ function ScheduleTab({
                       )}
                     </div>
                   </li>
-                )
-              )}
+                );
+              })}
             </ul>
           )}
         </div>
@@ -788,6 +1054,24 @@ function ScheduleTab({
 
   return (
     <section className="mt-5">
+      {passActive && trip.announcement && (
+        <div className="card mb-4 border-l-4 border-l-amber p-4">
+          <div className="flex items-start gap-2.5">
+            <span className="text-lg leading-none">📣</span>
+            <div className="min-w-0">
+              <p className="font-display text-[15px] font-bold leading-snug text-ink">{trip.announcement.text}</p>
+              <p className="mt-0.5 text-xs font-semibold text-ink-soft">
+                {trip.announcement.byName} · {new Date(trip.announcement.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {locked && (
+        <p className="mb-4 flex items-center gap-1.5 px-1 text-xs font-extrabold text-ink-soft">
+          🔒 The organizers have locked this itinerary — only they can change the plan.
+        </p>
+      )}
       <EventsStrip trip={trip} me={me} mutate={mutate} />
       <ActivitiesStrip trip={trip} me={me} mutate={mutate} />
       <MapSection trip={trip} />
@@ -801,9 +1085,13 @@ function ScheduleTab({
         </a>
       </div>
       <div>{allDays.map((day, i) => renderDay(day, i === allDays.length - 1))}</div>
-      {me ? (
+      {me && locked && !iAmOrg ? (
+        <div className="card mt-1 p-5 text-center text-sm font-semibold text-ink-soft">
+          🔒 This itinerary is locked — ask one of the organizers to add or change plans.
+        </div>
+      ) : me ? (
         <form onSubmit={submitAdd} className="card mt-1 p-5">
-          <h3 className="font-display text-lg font-bold text-teal-dark">Add to the plan</h3>
+          <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">Add to the plan</h3>
           <div className="mt-3 space-y-3.5">
             <div>
               <label className={labelCls}>What&apos;s happening?</label>
@@ -872,6 +1160,7 @@ function LodgingTab({
     checkOut: "",
     accessCode: "",
     wifi: "",
+    wifiPassword: "",
     contact: "",
     url: "",
     notes: "",
@@ -896,18 +1185,19 @@ function LodgingTab({
         ["Check-out", lodging.checkOut],
         ["Door code", lodging.accessCode],
         ["Wi-Fi", lodging.wifi],
+        ["Wi-Fi password", lodging.wifiPassword],
         ["Host / contact", lodging.contact],
       ]
     : [];
 
   return (
     <section className="mt-5">
-      <h2 className="mb-3 flex items-center gap-2 font-display text-lg font-bold text-ink">
+      <h2 className="mb-3 flex items-center gap-2 font-display text-xl font-extrabold tracking-tight text-ink">
         <HomeIcon className="h-5 w-5 text-coral" /> Where we&rsquo;re staying
       </h2>
 
       {editing ? (
-        <form onSubmit={save} className="space-y-3 rounded-2xl bg-cream-deep/60 px-4 py-4 ring-1 ring-cream-edge/50">
+        <form onSubmit={save} className="card space-y-3 p-5">
           <div>
             <label className={labelCls}>Stay name — Airbnb, hotel, …</label>
             <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Airbnb" />
@@ -930,8 +1220,12 @@ function LodgingTab({
               <input value={form.accessCode ?? ""} onChange={(e) => setForm({ ...form, accessCode: e.target.value })} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Wi-Fi</label>
-              <input value={form.wifi ?? ""} onChange={(e) => setForm({ ...form, wifi: e.target.value })} className={inputCls} placeholder="Network · password" />
+              <label className={labelCls}>Wi-Fi network</label>
+              <input value={form.wifi ?? ""} onChange={(e) => setForm({ ...form, wifi: e.target.value })} className={inputCls} placeholder="Network name" />
+            </div>
+            <div>
+              <label className={labelCls}>Wi-Fi password</label>
+              <input value={form.wifiPassword ?? ""} onChange={(e) => setForm({ ...form, wifiPassword: e.target.value })} className={inputCls} placeholder="Password" />
             </div>
           </div>
           <div>
@@ -968,38 +1262,46 @@ function LodgingTab({
           )}
         </form>
       ) : lodging ? (
-        <div className="rounded-2xl bg-cream-deep/60 px-4 py-4 ring-1 ring-cream-edge/50">
-          <div className="flex items-start justify-between gap-2">
-            <div className="font-display text-xl font-bold text-ink">{lodging.name}</div>
-            <button
-              className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
-              onClick={startEdit}
-            >
-              edit
-            </button>
-          </div>
-          {lodging.address && (
-            <div className="mt-1.5 flex items-center gap-1 text-sm font-semibold text-ink-soft">
-              <PinIcon className="h-3.5 w-3.5 shrink-0 text-coral" />
-              <a
-                href={mapsUrl(
-                  trip.location && !lodging.address.toLowerCase().includes(trip.location.toLowerCase())
-                    ? `${lodging.address}, ${trip.location}`
-                    : lodging.address
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline decoration-dotted underline-offset-2"
+        <div className="card overflow-hidden p-0">
+          <div className="bg-gradient-to-br from-teal-deep via-teal to-teal-light px-5 pb-5 pt-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-white/75">Home base</div>
+                <div className="mt-1 font-display text-2xl font-extrabold leading-tight tracking-tight text-white">
+                  {lodging.name}
+                </div>
+              </div>
+              <button
+                className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-extrabold text-white ring-1 ring-white/25 transition hover:bg-white/25"
+                onClick={startEdit}
               >
-                {lodging.address}
-              </a>
+                edit
+              </button>
             </div>
-          )}
-          <dl className="mt-3 space-y-1.5">
+            {lodging.address && (
+              <div className="mt-2 flex items-center gap-1 text-sm font-bold text-white/90">
+                <PinIcon className="h-3.5 w-3.5 shrink-0 text-amber" />
+                <a
+                  href={mapsUrl(
+                    trip.location && !lodging.address.toLowerCase().includes(trip.location.toLowerCase())
+                      ? `${lodging.address}, ${trip.location}`
+                      : lodging.address
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-dotted underline-offset-2"
+                >
+                  {lodging.address}
+                </a>
+              </div>
+            )}
+          </div>
+          <div className="px-5 py-4">
+          <dl className="divide-y divide-cream-edge/70">
             {rows
               .filter(([, v]) => v)
               .map(([k, v]) => (
-                <div key={k} className="flex gap-2 text-sm">
+                <div key={k} className="flex gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
                   <dt className="w-28 shrink-0 font-extrabold text-ink">{k}</dt>
                   <dd className="font-medium text-ink-soft">{v}</dd>
                 </div>
@@ -1010,7 +1312,7 @@ function LodgingTab({
               href={lodging.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-extrabold text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-teal-mist px-3.5 py-1.5 text-xs font-extrabold text-teal-dark transition hover:bg-amber-soft hover:text-amber-dark"
             >
               View the listing <ArrowRightIcon className="h-3.5 w-3.5" />
             </a>
@@ -1019,6 +1321,7 @@ function LodgingTab({
           {lodging.updatedBy && (
             <p className="mt-3 text-xs font-semibold text-ink-soft/70">Saved by {nameOf(lodging.updatedBy)}</p>
           )}
+          </div>
         </div>
       ) : (
         <div>
@@ -1082,8 +1385,8 @@ function FlightsTab({
     const smallNote =
       kind === "inbound" ? `departs ${formatTime(f.departTime)}` : `arrives ${formatTime(f.arriveTime)}`;
     return (
-      <article className="card overflow-hidden p-0 shadow-card">
-        <div className="px-5 pb-4 pt-4">
+      <article className="card overflow-hidden p-0">
+        <div className="px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <Avatar name={nameOf(f.attendeeId)} size="md" />
@@ -1091,7 +1394,7 @@ function FlightsTab({
                 <div className="truncate font-display text-[15px] font-bold leading-tight text-ink">
                   {nameOf(f.attendeeId)}
                 </div>
-                <div className="truncate text-xs font-bold text-ink-soft">
+                <div className="truncate font-display text-base font-extrabold leading-tight text-teal-dark">
                   {f.airline}
                   {f.flightNumber ? ` ${f.flightNumber}` : ""}
                 </div>
@@ -1099,16 +1402,16 @@ function FlightsTab({
             </div>
             <div className="shrink-0 text-right">
               <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ink-soft">{bigLabel}</div>
-              <div className="font-display text-[26px] font-bold leading-none text-teal-dark">{formatTime(bigTime)}</div>
+              <div className="font-display text-[28px] font-extrabold leading-none tracking-tight text-teal-dark">{formatTime(bigTime)}</div>
               <div className="mt-0.5 text-xs font-bold text-ink-soft">{formatDate(f.date)}</div>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2">
-            <span className="font-display text-xl font-bold tracking-wide text-ink">{f.fromAirport}</span>
+            <span className="font-display text-[22px] font-extrabold tracking-wide text-ink">{f.fromAirport}</span>
             <span className="relative flex-1 border-t-[3px] border-dotted border-teal/30">
               <PlaneIcon className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rotate-90 bg-white px-0.5 text-coral" />
             </span>
-            <span className="font-display text-xl font-bold tracking-wide text-ink">{f.toAirport}</span>
+            <span className="font-display text-[22px] font-extrabold tracking-wide text-ink">{f.toAirport}</span>
           </div>
           <div className="mt-1 text-xs font-semibold text-ink-soft">{smallNote}</div>
         </div>
@@ -1149,7 +1452,7 @@ function FlightsTab({
             <PlaneLandIcon className="h-5 w-5" />
           </span>
           <div>
-            <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Arrivals board</h3>
+            <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Arrivals board</h3>
             <p className="text-xs font-semibold text-ink-soft">Who lands when — plan the airport runs.</p>
           </div>
         </div>
@@ -1177,7 +1480,7 @@ function FlightsTab({
               <PlaneTakeoffIcon className="h-5 w-5" />
             </span>
             <div>
-              <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Heading home</h3>
+              <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Heading home</h3>
               <p className="text-xs font-semibold text-ink-soft">The sad part of the board. Sorry.</p>
             </div>
           </div>
@@ -1192,7 +1495,7 @@ function FlightsTab({
       {me ? (
         showForm ? (
           <form onSubmit={submit} className="card p-5">
-            <h3 className="font-display text-lg font-bold text-teal-dark">Add a flight</h3>
+            <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">Add a flight</h3>
             <div className="mt-3 space-y-3.5">
               <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
                 <div>
@@ -1298,12 +1601,18 @@ function MoneyTab({
   me,
   nameOf,
   mutate,
+  passOn,
+  orgIds,
 }: {
   trip: Trip;
   me?: Attendee;
   nameOf: (id: string) => string;
   mutate: Mutate;
+  passOn: boolean;
+  orgIds: string[];
 }) {
+  const passActive = passOn && Boolean(trip.pass);
+  const iAmOrg = me ? orgIds.includes(me.id) : false;
   const balances = useMemo(() => computeBalances(trip), [trip]);
   const transfers = useMemo(() => settleUp(balances), [balances]);
   const [form, setForm] = useState({ description: "", amount: "", paidBy: "", splitAmong: [] as string[] });
@@ -1341,15 +1650,18 @@ function MoneyTab({
 
   return (
     <section className="mt-5 space-y-5">
+      {/* Organizer Pass unlock — organizers only; attendees never see pricing */}
+      {passOn && !trip.pass && iAmOrg && me && <PassUnlockCard slug={trip.slug} actorId={me.id} />}
+
       {/* Balances */}
       <div className="card p-5">
-        <h3 className="font-display text-xl font-bold text-teal-dark">Who&apos;s up, who&apos;s down</h3>
+        <h3 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">Who&apos;s up, who&apos;s down</h3>
         <p className="text-sm font-medium text-ink-soft">The trip tab, kept honest.</p>
         <ul className="mt-3 space-y-1">
           {trip.attendees.map((a) => {
             const net = balances.get(a.id) ?? 0;
             return (
-              <li key={a.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-cream/70">
+              <li key={a.id} className="flex items-center gap-3 rounded-[20px] bg-white px-3 py-2.5 ring-1 ring-cream-edge/50">
                 <Avatar name={a.name} size="md" />
                 <span className="min-w-0 flex-1 truncate font-display text-[15px] font-bold text-ink">
                   {a.name}
@@ -1381,7 +1693,7 @@ function MoneyTab({
             <CoinsIcon className="h-5 w-5" />
           </span>
           <div>
-            <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Settle up</h3>
+            <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Settle up</h3>
             <p className="text-xs font-semibold text-ink-soft">Fewest handshakes possible.</p>
           </div>
         </div>
@@ -1408,7 +1720,7 @@ function MoneyTab({
                   <ArrowRightIcon className="h-4 w-4" />
                 </span>
                 <Avatar name={nameOf(t.toId)} size="md" />
-                <span className="ml-1 shrink-0 font-display text-xl font-bold text-teal-dark">
+                <span className="ml-1 shrink-0 font-display text-2xl font-extrabold tracking-tight text-teal-dark">
                   {formatMoney(t.amountCents)}
                 </span>
                 </div>
@@ -1499,10 +1811,15 @@ function MoneyTab({
         )}
       </div>
 
+      {/* Organizer Pass: paid-up board, group fund, organizer controls */}
+      {passActive && <SettledBoard trip={trip} />}
+      {passActive && <FundCard trip={trip} me={me} orgIds={orgIds} nameOf={nameOf} mutate={mutate} />}
+      {passActive && iAmOrg && me && <PassControlsCard trip={trip} me={me} orgIds={orgIds} mutate={mutate} />}
+
       {/* Add expense */}
       {me ? (
         <form onSubmit={submit} className="card p-5">
-          <h3 className="font-display text-lg font-bold text-teal-dark">Add an expense</h3>
+          <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">Add an expense</h3>
           <div className="mt-3 space-y-3.5">
             <div>
               <label className={labelCls}>What was it for?</label>
@@ -1576,31 +1893,49 @@ function MoneyTab({
       {/* Expense history */}
       {trip.expenses.length > 0 && (
         <div className="card p-5">
-          <h3 className="font-display text-lg font-bold text-teal-dark">The receipts</h3>
+          <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">The receipts</h3>
           <ul className="mt-2 divide-y divide-cream-edge/70">
             {[...trip.expenses]
               .sort((a, b) => b.createdAt - a.createdAt)
               .map((exp: Expense) => (
-                <li key={exp.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-display text-[15px] font-bold text-ink">{exp.description}</div>
-                    <div className="text-xs font-semibold text-ink-soft">
-                      {nameOf(exp.paidBy)} paid · split {exp.splitAmong.length} ways
+                <li key={exp.id} className="py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-display text-[15px] font-bold text-ink">{exp.description}</div>
+                      <div className="text-xs font-semibold text-ink-soft">
+                        {nameOf(exp.paidBy)} paid · split {exp.splitAmong.length} ways
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="font-display text-base font-bold text-teal-dark">{formatMoney(exp.amountCents)}</span>
+                      {me && (me.isOrganizer || exp.createdBy === me.id) && (
+                        <button
+                          className="text-xs font-extrabold text-coral-dark underline decoration-coral/50 underline-offset-2"
+                          onClick={() =>
+                            mutate(`/api/trips/${trip.slug}/expenses`, "DELETE", { id: exp.id, actorId: me.id }, "Expense deleted")
+                          }
+                        >
+                          delete
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className="font-display text-base font-bold text-teal-dark">{formatMoney(exp.amountCents)}</span>
-                    {me && (me.isOrganizer || exp.createdBy === me.id) && (
-                      <button
-                        className="text-xs font-extrabold text-coral-dark underline decoration-coral/50 underline-offset-2"
-                        onClick={() =>
-                          mutate(`/api/trips/${trip.slug}/expenses`, "DELETE", { id: exp.id, actorId: me.id }, "Expense deleted")
-                        }
-                      >
-                        delete
-                      </button>
-                    )}
-                  </div>
+                  {passActive && me && (
+                    <PaidChips
+                      slug={trip.slug}
+                      me={me}
+                      orgIds={orgIds}
+                      nameOf={nameOf}
+                      mutate={mutate}
+                      members={exp.splitAmong}
+                      marks={exp.payments}
+                      makeBody={(kind, attendeeId, method) =>
+                        kind === "mark"
+                          ? { actorId: me.id, action: "mark-share", expenseId: exp.id, attendeeId, method }
+                          : { actorId: me.id, action: "unmark-share", expenseId: exp.id, attendeeId }
+                      }
+                    />
+                  )}
                 </li>
               ))}
           </ul>
@@ -1613,6 +1948,538 @@ function MoneyTab({
       {/* To-bring / packing list */}
       <PackingSection trip={trip} me={me} nameOf={nameOf} mutate={mutate} />
     </section>
+  );
+}
+
+/* ---------------- Organizer Pass ---------------- */
+
+const METHOD_LABELS: Record<SharePaymentMethod, string> = {
+  venmo: "Venmo",
+  cashapp: "Cash App",
+  card: "Card",
+  cash: "Cash",
+};
+const METHOD_LIST = Object.keys(METHOD_LABELS) as SharePaymentMethod[];
+
+/**
+ * Chips for marking a set of people's shares paid/unpaid. Used for
+ * expense shares and for the group fund. A mark can be made by an
+ * organizer or by the person whose share it is — the API enforces
+ * the same rule server-side.
+ */
+function PaidChips({
+  slug,
+  me,
+  orgIds,
+  nameOf,
+  mutate,
+  members,
+  marks,
+  makeBody,
+}: {
+  slug: string;
+  me: Attendee;
+  orgIds: string[];
+  nameOf: (id: string) => string;
+  mutate: Mutate;
+  members: string[];
+  marks?: Record<string, SharePayment>;
+  makeBody: (
+    kind: "mark" | "unmark",
+    attendeeId: string,
+    method?: SharePaymentMethod
+  ) => Record<string, unknown>;
+}) {
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const iAmOrg = orgIds.includes(me.id);
+
+  async function doMark(kind: "mark" | "unmark", attendeeId: string, method?: SharePaymentMethod) {
+    setOpenFor(null);
+    await mutate(
+      `/api/trips/${slug}/pass`,
+      "POST",
+      makeBody(kind, attendeeId, method),
+      kind === "mark" ? "Marked paid ✓" : "Mark removed"
+    );
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {members.map((id) => {
+        const mark = marks?.[id];
+        const can = iAmOrg || me.id === id;
+        const first = nameOf(id).split(" ")[0];
+        if (mark) {
+          return (
+            <span
+              key={id}
+              className="inline-flex items-center gap-1 rounded-full bg-teal-mist px-2.5 py-1 text-[11px] font-extrabold text-teal-dark"
+            >
+              <CheckIcon className="h-3 w-3" /> {first} · {METHOD_LABELS[mark.method]}
+              {can && (
+                <button
+                  className="ml-0.5 font-bold underline decoration-teal/40 underline-offset-2"
+                  onClick={() => doMark("unmark", id)}
+                >
+                  undo
+                </button>
+              )}
+            </span>
+          );
+        }
+        return (
+          <span key={id} className="inline-flex flex-wrap items-center gap-1">
+            <button
+              disabled={!can}
+              onClick={() => setOpenFor(openFor === id ? null : id)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold transition ${
+                can
+                  ? "bg-cream-deep text-ink-soft ring-1 ring-cream-edge hover:ring-amber"
+                  : "bg-cream-deep/60 text-ink-soft/70"
+              }`}
+            >
+              {first} — unpaid
+            </button>
+            {can &&
+              openFor === id &&
+              METHOD_LIST.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => doMark("mark", id, m)}
+                  className="rounded-full bg-amber-soft px-2.5 py-1 text-[11px] font-extrabold text-amber-dark transition hover:bg-amber"
+                >
+                  {METHOD_LABELS[m]}
+                </button>
+              ))}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** "Who's actually paid" — per-person share totals vs. paid marks. */
+function SettledBoard({ trip }: { trip: Trip }) {
+  const rows = trip.attendees
+    .map((a) => {
+      let owed = 0;
+      let paid = 0;
+      for (const exp of trip.expenses) {
+        const share = shareCentsFor(exp, a.id);
+        if (share > 0) {
+          owed += share;
+          if (exp.payments?.[a.id]) paid += share;
+        }
+      }
+      return { a, owed, paid, left: owed - paid };
+    })
+    .filter((r) => r.owed > 0);
+  const fundCount = trip.fund ? Object.keys(trip.fundPayments ?? {}).length : 0;
+  const fundPool = trip.attendees.filter((x) => x.rsvp === "in");
+  const fundTotal = (fundPool.length > 0 ? fundPool : trip.attendees).length;
+  if (rows.length === 0 && !trip.fund) return null;
+  return (
+    <div className="card p-5">
+      <h3 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">Who&apos;s actually paid</h3>
+      <p className="text-sm font-medium text-ink-soft">
+        Shares marked paid, expense by expense — no more guessing from the group chat.
+      </p>
+      {rows.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {rows.map(({ a, owed, paid, left }) => (
+            <li key={a.id} className="flex items-center gap-3 rounded-2xl px-2 py-2">
+              <Avatar name={a.name} size="md" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-[15px] font-bold text-ink">{a.name}</span>
+                <span className="block text-xs font-semibold text-ink-soft">
+                  paid {formatMoney(paid)} of {formatMoney(owed)} in shares
+                </span>
+              </span>
+              {left > 0 ? (
+                <span className="shrink-0 rounded-full bg-coral-soft px-3 py-1.5 text-sm font-extrabold text-coral-dark">
+                  still owes {formatMoney(left)}
+                </span>
+              ) : (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-teal-mist px-3 py-1.5 text-sm font-extrabold text-teal-dark">
+                  <CheckIcon className="h-3.5 w-3.5" /> all paid
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {trip.fund && (
+        <p className="mt-3 border-t border-dashed border-cream-edge pt-3 text-sm font-bold text-teal-dark">
+          🏦 {trip.fund.label}: {fundCount} of {fundTotal} chipped in
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Group fund card: definition (organizer) + per-person paid marks. */
+function FundCard({
+  trip,
+  me,
+  orgIds,
+  nameOf,
+  mutate,
+}: {
+  trip: Trip;
+  me?: Attendee;
+  orgIds: string[];
+  nameOf: (id: string) => string;
+  mutate: Mutate;
+}) {
+  const iAmOrg = me ? orgIds.includes(me.id) : false;
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(trip.fund?.label ?? "");
+  const [amount, setAmount] = useState(trip.fund ? (trip.fund.perPersonCents / 100).toFixed(2) : "");
+  const inPool = trip.attendees.filter((a) => a.rsvp === "in");
+  const members = (inPool.length > 0 ? inPool : trip.attendees).map((a) => a.id);
+
+  if (!trip.fund && !iAmOrg) return null;
+
+  async function saveFund(e: React.FormEvent) {
+    e.preventDefault();
+    const dollars = parseFloat(amount);
+    if (!label.trim() || Number.isNaN(dollars) || dollars <= 0) return;
+    await mutate(
+      `/api/trips/${trip.slug}/pass`,
+      "POST",
+      { actorId: me!.id, action: "set-fund", label: label.trim(), perPersonCents: Math.round(dollars * 100) },
+      "Group fund saved"
+    );
+    setEditing(false);
+  }
+
+  const fundForm = (
+    <form onSubmit={saveFund} className="mt-3 space-y-3">
+      <div>
+        <label className={labelCls}>What&apos;s the fund for?</label>
+        <input
+          required
+          placeholder="House deposit, tee times, boat day…"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          className={inputCls}
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Per person</label>
+        <input
+          required
+          inputMode="decimal"
+          placeholder="$0.00"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={inputCls}
+        />
+      </div>
+      <div className="flex gap-2">
+        <button type="submit" className="btn-teal flex-1 py-2.5">
+          {trip.fund ? "Save changes" : "Start the fund"}
+        </button>
+        {trip.fund && (
+          <button type="button" className="btn-ghost px-5" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
+  );
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">🏦 Group fund</h3>
+          {trip.fund ? (
+            <p className="text-sm font-medium text-ink-soft">
+              {trip.fund.label} — <b className="text-teal-dark">{formatMoney(trip.fund.perPersonCents)}</b> per person
+            </p>
+          ) : (
+            <p className="text-sm font-medium text-ink-soft">
+              One pot for the big shared costs — collect it before the trip, not during.
+            </p>
+          )}
+        </div>
+        {trip.fund && iAmOrg && !editing && (
+          <span className="flex shrink-0 gap-2 text-xs font-extrabold">
+            <button
+              className="rounded-full bg-white px-3 py-1.5 text-teal-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-amber"
+              onClick={() => {
+                setLabel(trip.fund!.label);
+                setAmount((trip.fund!.perPersonCents / 100).toFixed(2));
+                setEditing(true);
+              }}
+            >
+              edit
+            </button>
+            <button
+              className="rounded-full bg-white px-3 py-1.5 text-coral-dark shadow-sm ring-1 ring-cream-edge transition hover:ring-coral"
+              onClick={() =>
+                mutate(`/api/trips/${trip.slug}/pass`, "POST", { actorId: me!.id, action: "clear-fund" }, "Fund closed")
+              }
+            >
+              close
+            </button>
+          </span>
+        )}
+      </div>
+      {trip.fund && me && (
+        <PaidChips
+          slug={trip.slug}
+          me={me}
+          orgIds={orgIds}
+          nameOf={nameOf}
+          mutate={mutate}
+          members={members}
+          marks={trip.fundPayments}
+          makeBody={(kind, attendeeId, method) =>
+            kind === "mark"
+              ? { actorId: me.id, action: "mark-fund", attendeeId, method }
+              : { actorId: me.id, action: "unmark-fund", attendeeId }
+          }
+        />
+      )}
+      {iAmOrg && (!trip.fund || editing) && fundForm}
+    </div>
+  );
+}
+
+/** Organizer controls for pass trips: announcement, lock, co-organizers. */
+function PassControlsCard({
+  trip,
+  me,
+  orgIds,
+  mutate,
+}: {
+  trip: Trip;
+  me: Attendee;
+  orgIds: string[];
+  mutate: Mutate;
+}) {
+  const [annText, setAnnText] = useState(trip.announcement?.text ?? "");
+  const primaryId = trip.attendees.find((a) => a.isOrganizer)?.id;
+
+  async function toggleCoOrganizer(id: string) {
+    const next = orgIds.includes(id) ? orgIds.filter((x) => x !== id) : [...orgIds, id];
+    await mutate(
+      `/api/trips/${trip.slug}/pass`,
+      "POST",
+      { actorId: me.id, action: "set-organizers", organizerIds: next },
+      "Organizers updated"
+    );
+  }
+
+  return (
+    <div className="card p-5">
+      <h3 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">⭐ Organizer controls</h3>
+
+      <div className="mt-4">
+        <label className={labelCls}>Pinned announcement (top of the Plan tab)</label>
+        <textarea
+          value={annText}
+          onChange={(e) => setAnnText(e.target.value)}
+          placeholder="Meet at the house at 6 — cars leave at 6:15 sharp."
+          rows={2}
+          maxLength={280}
+          className={inputCls}
+        />
+        <div className="mt-2 flex gap-2">
+          <button
+            className="btn-teal flex-1 py-2 text-sm"
+            disabled={!annText.trim()}
+            onClick={() =>
+              mutate(
+                `/api/trips/${trip.slug}/pass`,
+                "POST",
+                { actorId: me.id, action: "set-announcement", text: annText.trim() },
+                "Announcement pinned 📣"
+              )
+            }
+          >
+            {trip.announcement ? "Update announcement" : "Pin announcement"}
+          </button>
+          {trip.announcement && (
+            <button
+              className="btn-ghost px-4 py-2 text-sm"
+              onClick={() =>
+                mutate(
+                  `/api/trips/${trip.slug}/pass`,
+                  "POST",
+                  { actorId: me.id, action: "clear-announcement" },
+                  "Announcement cleared"
+                )
+              }
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-dashed border-cream-edge pt-4">
+        <div>
+          <div className="font-display text-[15px] font-bold text-ink">Itinerary lock</div>
+          <p className="text-xs font-semibold text-ink-soft">
+            {trip.itineraryLocked
+              ? "Locked — only organizers can change the plan."
+              : "Off — anyone on the crew can add to the plan."}
+          </p>
+        </div>
+        <button
+          className={`shrink-0 rounded-full px-4 py-2 text-sm font-extrabold transition ${
+            trip.itineraryLocked ? "bg-coral text-white" : "bg-cream-deep text-teal-dark ring-1 ring-cream-edge hover:ring-amber"
+          }`}
+          onClick={() =>
+            mutate(
+              `/api/trips/${trip.slug}/pass`,
+              "POST",
+              { actorId: me.id, action: "set-lock", locked: !trip.itineraryLocked },
+              trip.itineraryLocked ? "Itinerary unlocked" : "Itinerary locked 🔒"
+            )
+          }
+        >
+          {trip.itineraryLocked ? "Unlock" : "Lock it"}
+        </button>
+      </div>
+
+      <div className="mt-5 border-t border-dashed border-cream-edge pt-4">
+        <div className="font-display text-[15px] font-bold text-ink">Co-organizers</div>
+        <p className="text-xs font-semibold text-ink-soft">
+          Co-organizers can pin announcements, run the fund and the lock, and mark payments.
+        </p>
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {trip.attendees.map((a) => {
+            const isPrimary = a.id === primaryId;
+            const on = orgIds.includes(a.id);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                disabled={isPrimary}
+                onClick={() => toggleCoOrganizer(a.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-display text-sm font-bold transition ${
+                  on
+                    ? "bg-teal text-white shadow-teal"
+                    : "bg-cream-deep text-ink-soft ring-1 ring-cream-edge hover:ring-amber"
+                } ${isPrimary ? "cursor-default opacity-80" : ""}`}
+              >
+                {on && <CheckIcon className="h-3.5 w-3.5" />}
+                {a.name}
+                {isPrimary ? " (organizer)" : ""}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The one and only place pricing appears: organizers of a trip without
+ * a pass, on the Money tab, while the pass is switched on. Attendees
+ * never see this card.
+ */
+/* Header pill-button: the Organizer Pass unlock, visible on every tab for a
+   claimed organizer whose trip has no pass yet. Pulses softly (pass-pulse)
+   so it's findable; one tap goes straight to Stripe checkout. Attendees and
+   unclaimed viewers never see it — pricing stays organizer-only. */
+function PassHeaderButton({ slug, actorId }: { slug: string; actorId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function unlock() {
+    setBusy(true);
+    setFailed(false);
+    try {
+      const res = await fetch(`/api/trips/${slug}/pass/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url as string;
+        return;
+      }
+      if (res.ok && data.alreadyPurchased) {
+        window.location.reload();
+        return;
+      }
+      setFailed(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={unlock}
+      disabled={busy}
+      className="pass-pulse inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1.5 text-teal-deep ring-1 ring-white/30 disabled:opacity-60"
+    >
+      ⭐ {busy ? "Opening checkout…" : failed ? "Tap to retry — Organizer Pass $19.99" : "Unlock Organizer Pass · $19.99"}
+    </button>
+  );
+}
+
+function PassUnlockCard({ slug, actorId }: { slug: string; actorId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function unlock() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch(`/api/trips/${slug}/pass/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url as string;
+        return;
+      }
+      if (res.ok && data.alreadyPurchased) {
+        window.location.reload();
+        return;
+      }
+      setMsg((data.message as string) ?? (data.error as string) ?? "Checkout didn't open — try again in a moment.");
+    } catch {
+      setMsg("Checkout didn't open — try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-deep via-teal to-teal-light p-5 shadow-teal">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-display text-2xl font-extrabold tracking-tight text-white">⭐ Organizer Pass</h3>
+        <span className="shrink-0 font-display text-xl font-bold text-amber">
+          $19.99 <span className="text-xs font-extrabold text-teal-mist">one-time</span>
+        </span>
+      </div>
+      <p className="mt-1 text-sm font-semibold text-teal-mist">
+        Optional — this trip works fully without it. The pass adds the money tools: see who&apos;s
+        actually paid each split, run a group fund for the big shared costs, add co-organizers,
+        pin an announcement, and lock the itinerary when it&apos;s final.
+      </p>
+      <button onClick={unlock} disabled={busy} className="btn-amber pass-pulse mt-4 w-full py-3 disabled:opacity-60">
+        {busy ? "Opening secure checkout…" : "Unlock the pass for this trip"}
+      </button>
+      {msg && <p className="mt-2.5 text-center text-xs font-bold text-white/90">{msg}</p>}
+      <p className="mt-2 text-center text-[11px] font-semibold text-teal-mist/80">
+        One payment, this trip only. No subscription, no charges for your crew.
+      </p>
+    </div>
   );
 }
 
@@ -1653,7 +2520,7 @@ function ShoppingSection({
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-display text-lg font-bold text-teal-dark">🛒 Shopping list</h3>
+        <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">🛒 Shopping list</h3>
         {items.length > 0 && (
           <span className="shrink-0 rounded-full bg-amber-soft px-3 py-1 font-display text-sm font-bold text-amber-dark">
             {pickedUp} of {items.length} picked up
@@ -1687,7 +2554,7 @@ function ShoppingSection({
                       item.checked ? "Back on the list" : "Picked up ✓"
                     )
                   }
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-2 transition ${
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2 transition ${
                     item.checked
                       ? "bg-teal text-white ring-teal"
                       : "bg-white ring-cream-edge hover:ring-amber disabled:hover:ring-cream-edge"
@@ -1797,16 +2664,16 @@ function WeatherStrip({ slug }: { slug: string }) {
   if (data.status !== "ok" || !data.days?.length) return null;
 
   return (
-    <div className="card mt-5 p-4">
+    <div className="card mt-5 p-5">
       <div className="flex items-baseline justify-between gap-2 px-1">
-        <h3 className="font-display text-base font-bold text-teal-dark">Trip forecast</h3>
+        <h3 className="font-display text-lg font-extrabold tracking-tight text-teal-dark">Trip forecast</h3>
         {data.place && <span className="truncate text-xs font-bold text-ink-soft">{data.place}</span>}
       </div>
       <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1">
         {data.days.map((d) => (
           <div
             key={d.date}
-            className="flex w-[68px] shrink-0 flex-col items-center rounded-2xl bg-cream-deep/60 px-2 py-2.5 ring-1 ring-cream-edge/50"
+            className="flex w-[72px] shrink-0 flex-col items-center rounded-3xl bg-white px-2 py-3 shadow-sm ring-1 ring-cream-edge/60"
           >
             <span className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
               {formatDate(d.date).split(",")[0]}
@@ -1863,6 +2730,10 @@ function MapSection({ trip }: { trip: Trip }) {
     if (!data || data.points.length === 0 || !mapEl.current || mapObj.current) return;
     let cancelled = false;
     (async () => {
+      // Leaflet's stylesheet loads on demand with the library (it used to
+      // be a top-level import, which put ~10 kB of map-only CSS in the
+      // trip page's initial bundle for every visitor).
+      await import("leaflet/dist/leaflet.css");
       const L = (await import("leaflet")).default;
       if (cancelled || !mapEl.current) return;
       const map = L.map(mapEl.current, { scrollWheelZoom: false });
@@ -1920,7 +2791,7 @@ function MapSection({ trip }: { trip: Trip }) {
           <PinIcon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Trip map</h3>
+          <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Trip map</h3>
           <p className="text-xs font-semibold text-ink-soft">
             {[
               venueCount > 0 ? `${venueCount} event venue${venueCount === 1 ? "" : "s"}` : null,
@@ -1933,7 +2804,7 @@ function MapSection({ trip }: { trip: Trip }) {
           </p>
         </div>
       </div>
-      <div className="card mt-3 overflow-hidden p-1.5">
+      <div className="card mt-3 overflow-hidden p-2">
         <div ref={mapEl} className="z-0 h-[320px] w-full rounded-[20px]" />
         <div className="flex items-center gap-4 px-3 py-2 text-[11px] font-bold text-ink-soft">
           <span className="inline-flex items-center gap-1.5">
@@ -1990,16 +2861,16 @@ function EventsStrip({ trip, me, mutate }: { trip: Trip; me?: Attendee; mutate: 
       <div className="flex items-center gap-2.5 px-1">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-coral text-lg text-white shadow-coral">🎟️</span>
         <div>
-          <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Happening while you&apos;re there</h3>
+          <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Happening while you&apos;re there</h3>
           <p className="text-xs font-semibold text-ink-soft">Events at the destination on your dates.</p>
         </div>
       </div>
       <div className="mt-3 space-y-2.5">
         {events.slice(0, 8).map((ev) => (
-          <article key={ev.id} className="card flex items-center gap-3 p-3.5">
+          <article key={ev.id} className="card flex items-center gap-3 p-4">
             {ev.image && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={ev.image} alt="" loading="lazy" className="h-14 w-20 shrink-0 rounded-xl object-cover" />
+              <img src={ev.image} alt="" loading="lazy" className="h-14 w-20 shrink-0 rounded-2xl object-cover" />
             )}
             <div className="min-w-0 flex-1">
               <div className="truncate font-display text-[15px] font-bold leading-tight text-ink">{ev.name}</div>
@@ -2090,14 +2961,14 @@ function ActivitiesStrip({ trip, me, mutate }: { trip: Trip; me?: Attendee; muta
       <div className="flex items-center gap-2.5 px-1">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal text-lg text-white shadow-teal">🧭</span>
         <div>
-          <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Things to do in {data.city}</h3>
+          <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Things to do in {data.city}</h3>
           <p className="text-xs font-semibold text-ink-soft">Bookable tours &amp; activities, hand-picked for this trip.</p>
         </div>
       </div>
       <div className="mt-3 space-y-2.5">
         {data.activities.map((a) => (
-          <article key={a.id} className="card flex items-center gap-3 p-3.5">
-            <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-teal-mist text-3xl">{a.emoji}</span>
+          <article key={a.id} className="card flex items-center gap-3 p-4">
+            <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-2xl bg-teal-mist text-3xl">{a.emoji}</span>
             <div className="min-w-0 flex-1">
               <div className="font-display text-[15px] font-bold leading-tight text-ink">{a.title}</div>
               <p className="mt-0.5 text-xs font-semibold leading-snug text-ink-soft">{a.blurb}</p>
@@ -2193,7 +3064,7 @@ function PollsSection({
       <div className="flex items-center gap-2.5 px-1">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal text-lg text-white shadow-teal">🗳️</span>
         <div>
-          <h3 className="font-display text-xl font-bold leading-tight text-teal-dark">Crew decisions</h3>
+          <h3 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-teal-dark">Crew decisions</h3>
           <p className="text-xs font-semibold text-ink-soft">Put it to a vote instead of a 200-message thread.</p>
         </div>
       </div>
@@ -2233,7 +3104,7 @@ function PollsSection({
                           mine ? "Vote removed" : "Vote counted 🗳️"
                         )
                       }
-                      className={`relative block w-full overflow-hidden rounded-2xl px-3.5 py-2.5 text-left ring-2 transition ${
+                      className={`relative block w-full overflow-hidden rounded-[20px] px-4 py-3 text-left ring-2 transition ${
                         mine
                           ? "bg-teal-mist/60 ring-teal"
                           : "bg-cream-deep/50 ring-cream-edge/60 hover:ring-amber disabled:hover:ring-cream-edge/60"
@@ -2368,7 +3239,7 @@ function PackingSection({
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-display text-lg font-bold text-teal-dark">🎒 To bring</h3>
+        <h3 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">🎒 To bring</h3>
         {items.length > 0 && (
           <span className="shrink-0 rounded-full bg-amber-soft px-3 py-1 font-display text-sm font-bold text-amber-dark">
             {packed} of {items.length} packed
@@ -2405,7 +3276,7 @@ function PackingSection({
                         item.checked ? "Back on the list" : "Packed ✓"
                       )
                     }
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-2 transition ${
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2 transition ${
                       item.checked
                         ? "bg-teal text-white ring-teal"
                         : "bg-white ring-cream-edge hover:ring-amber disabled:hover:ring-cream-edge"

@@ -7,6 +7,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const trip = await getTrip(slug);
   if (!trip) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+  // The Stripe session id on a pass record is a payment internal — it
+  // never leaves the server. Trips without a pass are returned exactly
+  // as stored (byte-for-byte the pre-pass response).
+  if (trip.pass) {
+    const publicPass = { purchasedAt: trip.pass.purchasedAt, byName: trip.pass.byName };
+    return NextResponse.json({ trip: { ...trip, pass: publicPass } });
+  }
   return NextResponse.json({ trip });
 }
 

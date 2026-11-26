@@ -1,4 +1,33 @@
-import type { Trip, Transfer } from "./types";
+import type { Expense, Trip, Transfer } from "./types";
+
+/**
+ * Attendee ids with organizer powers for a trip, creator first.
+ * Uses the stored `organizers` list when present (Organizer Pass
+ * co-organizers live there); otherwise derives from the attendees'
+ * isOrganizer flags — the pre-pass model. Pure derivation: reading a
+ * trip never persists this back.
+ */
+export function organizerIds(trip: Trip): string[] {
+  if (Array.isArray(trip.organizers) && trip.organizers.length > 0) {
+    const valid = trip.organizers.filter((id) => trip.attendees.some((a) => a.id === id));
+    if (valid.length > 0) return valid;
+  }
+  return trip.attendees.filter((a) => a.isOrganizer).map((a) => a.id);
+}
+
+export function isOrganizerId(trip: Trip, attendeeId: string | undefined): boolean {
+  if (!attendeeId) return false;
+  return organizerIds(trip).includes(attendeeId);
+}
+
+/** The cents one attendee's equal share of an expense comes to
+ *  (position-aware, matches how computeBalances splits). 0 if the
+ *  attendee isn't part of the split. */
+export function shareCentsFor(expense: Expense, attendeeId: string): number {
+  const idx = expense.splitAmong.indexOf(attendeeId);
+  if (idx < 0) return 0;
+  return splitCents(expense.amountCents, expense.splitAmong.length)[idx] ?? 0;
+}
 
 /** Split `amountCents` equally among n people; remainder cents go to the
  *  first `amount % n` participants (in the order given). Sums exactly. */

@@ -4,3 +4,7 @@ data/
 backups/
 .env*.local
 *.log
+
+# Local-only pre-push leak gate — contains the personal identifiers it
+# scans for, so it must never be published to this public repo.
+scripts/leak_check.py

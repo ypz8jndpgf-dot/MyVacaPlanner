@@ -24,12 +24,28 @@ const config: Config = {
         display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        /* Sleek pass: flat, neutral shadows — no colored glows. */
-        card: "0 1px 2px rgb(20 27 31 / 0.05), 0 10px 30px -14px rgb(20 27 31 / 0.14)",
-        lift: "0 16px 40px -16px rgb(20 27 31 / 0.22)",
-        coral: "0 6px 16px -6px rgb(20 27 31 / 0.25)",
+        /* Facelift (2026-11-16): soft layered shadows — one restrained
+         * system, no colored glows. card = resting surface, lift = raised
+         * (hero/featured), pop = floating (sticky bars, toasts). */
+        card: "0 1px 2px rgb(20 27 31 / 0.04), 0 8px 24px -12px rgb(20 27 31 / 0.12)",
+        soft: "0 1px 2px rgb(20 27 31 / 0.04), 0 12px 32px -16px rgb(20 27 31 / 0.16)",
+        lift: "0 20px 48px -20px rgb(20 27 31 / 0.28)",
+        pop: "0 8px 28px -8px rgb(20 27 31 / 0.28)",
+        coral: "0 6px 16px -6px rgb(232 80 63 / 0.45)",
         amber: "0 6px 16px -6px rgb(20 27 31 / 0.22)",
         teal: "0 6px 16px -6px rgb(7 60 70 / 0.35)",
+      },
+      borderRadius: {
+        "4xl": "2rem",
+      },
+      keyframes: {
+        fadeUp: {
+          "0%": { opacity: "0", transform: "translateY(6px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-up": "fadeUp 0.25s ease-out both",
       },
     },
   },

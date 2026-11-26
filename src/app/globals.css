@@ -4,8 +4,7 @@
 
 body {
   @apply bg-cream text-ink antialiased;
-  /* Sleek pass (2026-11-11): the dotted route-map texture is gone —
-   * the canvas is clean soft white. */
+  /* Facelift (2026-11-16): clean soft-white canvas, no texture. */
 }
 
 ::selection {
@@ -36,7 +35,7 @@ a:focus-visible {
 @layer components {
   /* ---- Friendly form controls ---- */
   .input-warm {
-    @apply w-full min-w-0 rounded-xl border border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(20_27_31/0.04)] transition placeholder:font-medium placeholder:text-slate-400;
+    @apply w-full min-w-0 rounded-2xl border border-cream-edge bg-white px-4 py-3 font-semibold text-ink shadow-[inset_0_1px_3px_rgb(20_27_31/0.04)] transition placeholder:font-medium placeholder:text-slate-400;
   }
   .label-warm {
     @apply mb-1.5 block text-[13px] font-extrabold tracking-wide text-teal-dark;
@@ -54,25 +53,38 @@ a:focus-visible {
     }
   }
 
-  /* ---- Buttons ---- */
-  /* Sleek pass: the primary action is near-black ink (coral is demoted
-   * to small accents), and buttons no longer bounce on hover. */
+  /* ---- Buttons ----
+     Facelift: coral is the single action accent (btn-coral is coral
+     again); ink-teal is the primary for secondary actions. All buttons
+     get a subtle press state. */
   .btn-coral {
-    @apply rounded-full bg-ink font-display font-bold text-white shadow-coral transition duration-200 hover:bg-teal-dark disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-coral font-display font-bold text-white shadow-coral transition duration-200 hover:bg-coral-dark active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-teal {
-    @apply rounded-full bg-teal font-display font-bold text-white shadow-teal transition duration-200 hover:bg-teal-light disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-teal font-display font-bold text-white shadow-teal transition duration-200 hover:bg-teal-light active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-amber {
-    @apply rounded-full bg-amber font-display font-bold text-teal-deep shadow-amber transition duration-200 hover:bg-amber-dark hover:text-white disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-amber font-display font-bold text-teal-deep shadow-amber transition duration-200 hover:bg-amber-dark hover:text-white active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-ghost {
-    @apply rounded-full bg-white font-display font-bold text-teal-dark shadow-card ring-1 ring-cream-edge transition duration-200 hover:ring-amber disabled:pointer-events-none disabled:opacity-50;
+    @apply rounded-full bg-white font-display font-bold text-teal-dark shadow-card ring-1 ring-cream-edge transition duration-200 hover:ring-amber active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
 
-  /* ---- Surfaces ---- */
+  /* ---- Surfaces ----
+     Facelift: large radii (26px), soft layered shadow, hairline ring.
+     One surface class for every card on the site. */
   .card {
-    @apply rounded-2xl bg-white shadow-card ring-1 ring-cream-edge/70;
+    @apply rounded-[26px] bg-white shadow-soft ring-1 ring-ink/[0.06];
+  }
+
+  /* Frosted glass bar — sticky tab bar, bottom nav, floating pills. */
+  .glass {
+    @apply border border-white/60 bg-white/85 shadow-pop backdrop-blur-xl;
+  }
+
+  /* Subtle entrance for tab content when the tab changes. */
+  .tab-fade {
+    animation: fadeUp 0.25s ease-out both;
   }
 
   /* Boarding-pass perforation: dashed tear line with punched notches.
@@ -99,32 +111,26 @@ a:focus-visible {
   .ticket-divider::after {
     right: calc(-1 * var(--notch));
   }
-}
 
-/* Gentle bob for the hero sun */
-@keyframes bob {
-  0%,
-  100% {
-    transform: translateY(0);
+  /* Organizer Pass CTA: a soft amber ring pulse so the unlock is findable
+     from any tab without shouting. Honors reduced-motion. */
+  .pass-pulse {
+    animation: passPulse 2.2s ease-out infinite;
   }
-  50% {
-    transform: translateY(-8px);
+  @keyframes passPulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(245, 185, 63, 0.55);
+    }
+    70% {
+      box-shadow: 0 0 0 12px rgba(245, 185, 63, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(245, 185, 63, 0);
+    }
   }
-}
-.animate-bob {
-  animation: bob 5s ease-in-out infinite;
-}
-
-/* Paper plane drifting along the hero route */
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg);
+  @media (prefers-reduced-motion: reduce) {
+    .pass-pulse {
+      animation: none;
+    }
   }
-  50% {
-    transform: translate(6px, -5px) rotate(4deg);
-  }
-}
-.animate-drift {
-  animation: drift 6s ease-in-out infinite;
 }

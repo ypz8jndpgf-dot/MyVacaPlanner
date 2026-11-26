@@ -8,11 +8,13 @@ import {
   ArrowRightIcon,
   CalendarIcon,
   CoinsIcon,
+  contactsPickerAvailable,
+  pickContactNames,
   PaperPlaneIcon,
   PinIcon,
+  coverGradient,
   mapsUrl,
   PlaneIcon,
-  SunIcon,
   UsersIcon,
 } from "@/components/ui";
 
@@ -25,12 +27,58 @@ interface TripSummary {
   attendeeCount: number;
 }
 
+/* Decorative avatar-stack colors for the homepage (no names available
+ * from the trip summaries — just the crew count). */
+const STACK_COLORS = ["#C4503F", "#2F6F79", "#B9852F", "#3E7A72", "#0B5563", "#A96A44"];
+
+function CrewStack({ count }: { count: number }) {
+  if (count === 0) return null;
+  const shown = Math.min(count, 5);
+  return (
+    <span className="flex items-center">
+      <span className="flex -space-x-2">
+        {Array.from({ length: shown }).map((_, i) => (
+          <span
+            key={i}
+            className="h-7 w-7 rounded-full ring-2 ring-white"
+            style={{ backgroundColor: STACK_COLORS[i % STACK_COLORS.length] }}
+          />
+        ))}
+        {count > shown && (
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-[10px] font-extrabold text-white ring-2 ring-white">
+            +{count - shown}
+          </span>
+        )}
+      </span>
+      <span className="ml-2 text-xs font-bold text-ink-soft">
+        {count} {count === 1 ? "traveler" : "travelers"}
+      </span>
+    </span>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [form, setForm] = useState({ name: "", location: "", startDate: "", endDate: "", organizerName: "" });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  // Contact Picker API exists only on some phones — the pick button
+  // renders only where it can actually work.
+  const [contactsOk, setContactsOk] = useState(false);
+  useEffect(() => {
+    setContactsOk(contactsPickerAvailable());
+  }, []);
+
+  async function fillOrganizerFromContacts() {
+    try {
+      const names = await pickContactNames(false);
+      if (names[0]) setForm((f) => ({ ...f, organizerName: names[0] }));
+    } catch {
+      /* picker dismissed — nothing to do */
+    }
+  }
 
   useEffect(() => {
     fetch("/api/trips")
@@ -83,59 +131,48 @@ export default function HomePage() {
           }),
         }}
       />
-      {/* ------- Hero: gradient sky, sun, dotted route ------- */}
+      {/* ------- Hero: clean cover, one big promise ------- */}
       <section className="relative overflow-hidden bg-gradient-to-b from-teal-deep via-teal to-teal-light">
-        {/* sun glow */}
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-amber/25 blur-3xl" />
-        <div className="pointer-events-none absolute -left-24 top-40 h-56 w-56 rounded-full bg-coral/20 blur-3xl" />
-        <SunIcon className="absolute right-6 top-8 h-14 w-14 text-amber" />
-        {/* dotted flight route */}
-        <svg
-          viewBox="0 0 600 120"
-          preserveAspectRatio="none"
-          className="pointer-events-none absolute inset-x-0 top-24 h-28 w-full text-white/25"
-          aria-hidden
-        >
-          <path
-            d="M-10 95 C 140 20, 300 115, 430 55 S 580 30, 615 45"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeDasharray="0.1 11"
-          />
-        </svg>
-        <PaperPlaneIcon className="absolute right-[16%] top-[5.7rem] h-6 w-6 rotate-12 text-amber" />
+        <div className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full bg-amber/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-28 bottom-0 h-72 w-72 rounded-full bg-coral/15 blur-3xl" />
 
-        <div className="relative mx-auto max-w-xl px-4 pb-28 pt-12 text-center">
-          {/* logo lockup */}
-          <div className="flex flex-col items-center">
+        <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-10 sm:pt-14">
+          <div className="flex items-center gap-3">
             <Image
               src="/logo.webp"
               alt="MyVacaPlanner"
-              width={104}
-              height={104}
-              className="rounded-[1.4rem] shadow-lift ring-4 ring-white/25"
+              width={52}
+              height={52}
+              className="rounded-2xl shadow-lift ring-2 ring-white/25"
             />
-            <div className="mt-4 font-display text-[2rem] font-bold leading-none tracking-tight text-white">
-              My<span className="text-amber">Vaca</span>Planner
-            </div>
-            <div className="mt-1.5 text-[11px] font-extrabold uppercase tracking-[0.3em] text-teal-mist/90">
-              myvacaplanner.com
+            <div>
+              <div className="font-display text-xl font-bold leading-none tracking-tight text-white">
+                My<span className="text-amber">Vaca</span>Planner
+              </div>
+              <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.28em] text-teal-mist/90">
+                myvacaplanner.com
+              </div>
             </div>
           </div>
 
-          <h1 className="mt-8 font-display text-4xl font-bold leading-[1.12] text-white">
-            Every trip. <span className="text-amber">One link.</span>
+          <h1 className="mt-10 max-w-2xl font-display text-5xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl">
+            Every trip.
             <br />
-            Zero group-text chaos.
+            <span className="text-amber">One link.</span>
           </h1>
-          <p className="mx-auto mt-3 max-w-sm text-[15px] font-semibold leading-relaxed text-teal-mist">
+          <p className="mt-4 max-w-md text-[17px] font-medium leading-relaxed text-teal-mist">
             Who&apos;s in, who lands when, what&apos;s on, and who owes who — the whole trip in one
-            friendly place. No accounts, no app install.
+            place. No accounts, no app install.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs font-extrabold text-white">
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <button onClick={() => setShowCreate(true)} className="btn-coral inline-flex items-center gap-2 px-7 py-3.5 text-base">
+              <PaperPlaneIcon className="h-5 w-5" /> Plan a trip
+            </button>
+            <span className="text-sm font-bold text-teal-mist">Free to start · share the link with your crew</span>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center gap-2 text-xs font-extrabold text-white">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/25">
               <UsersIcon className="h-4 w-4" /> Crew &amp; RSVPs
             </span>
@@ -150,38 +187,42 @@ export default function HomePage() {
             </span>
           </div>
         </div>
-
-        {/* wave into the cream canvas */}
-        <svg
-          viewBox="0 0 1440 90"
-          preserveAspectRatio="none"
-          className="absolute bottom-0 left-0 h-12 w-full sm:h-16"
-          aria-hidden
-        >
-          <path d="M0,50 C240,92 480,2 720,34 C960,66 1200,90 1440,42 L1440,90 L0,90 Z" fill="#F7F7F4" />
-        </svg>
       </section>
 
-      <div className="relative z-10 mx-auto -mt-14 max-w-xl space-y-5 px-4">
-        {/* ------- Featured trip: boarding pass ------- */}
+      <div className="mx-auto max-w-3xl space-y-6 px-4 sm:px-5">
+        {/* ------- Featured trip: cover card ------- */}
         {featured && (
           <button
             onClick={() => router.push(`/t/${featured.slug}`)}
-            className="card group block w-full p-0 text-left shadow-lift transition duration-200 "
+            className="card group -mt-8 block w-full overflow-hidden p-0 text-left shadow-lift transition duration-200 hover:-translate-y-0.5"
           >
-            <div className="px-6 pb-5 pt-5">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.22em] text-amber-dark">
-                  <PlaneIcon className="h-4 w-4" /> Boarding pass · Featured trip
+            <div className={`relative bg-gradient-to-br ${coverGradient(featured.slug)} px-6 pb-5 pt-6`}>
+              <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+              <div className="relative flex items-start justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-[0.22em] text-white/80">
+                  <PlaneIcon className="h-4 w-4 text-amber" /> Featured trip
                 </span>
-                <span className="rounded-full bg-coral-soft px-2.5 py-1 text-[11px] font-extrabold text-coral-dark">
+                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-extrabold text-white ring-1 ring-white/25">
                   You&apos;re invited
                 </span>
               </div>
-              <div className="mt-2 font-display text-[2rem] font-bold leading-tight text-teal-dark">
+              <div className="relative mt-3 font-display text-4xl font-extrabold leading-none tracking-tight text-white">
                 {featured.name} 🏌️
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              {featured.location && (
+                <a
+                  href={mapsUrl(featured.location)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative mt-2 inline-flex items-center gap-1 text-sm font-bold text-white/90 underline decoration-dotted underline-offset-2"
+                >
+                  <PinIcon className="h-4 w-4 text-amber" /> {featured.location}
+                </a>
+              )}
+            </div>
+            <div className="px-6 pb-5 pt-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ink-soft">Touchdown</div>
                   <div className="mt-0.5 font-display text-[15px] font-bold leading-snug text-ink">
@@ -201,141 +242,231 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
-              {featured.location && (
-                <a
-                  href={mapsUrl(featured.location)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-teal underline decoration-dotted underline-offset-2"
-                >
-                  <PinIcon className="h-4 w-4 text-coral" /> {featured.location}
-                </a>
-              )}
-            </div>
-            <div className="ticket-divider mx-6" />
-            <div className="flex items-center justify-between px-6 py-4">
-              <span className="text-sm font-semibold text-ink-soft">Gate opens now — come on in</span>
-              <span className="btn-coral inline-flex items-center gap-1.5 px-5 py-2.5 text-sm group-hover:bg-coral-dark">
-                Open trip HQ <ArrowRightIcon className="h-4 w-4" />
-              </span>
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-cream-edge/70 pt-4">
+                <CrewStack count={featured.attendeeCount} />
+                <span className="btn-coral inline-flex shrink-0 items-center gap-1.5 px-5 py-2.5 text-sm group-hover:bg-coral-dark">
+                  Open trip HQ <ArrowRightIcon className="h-4 w-4" />
+                </span>
+              </div>
             </div>
           </button>
         )}
 
-        {/* ------- All trips ------- */}
+        {/* ------- All trips: cover cards ------- */}
         {others.length > 0 && (
-          <section className="card p-5">
-            <h2 className="font-display text-lg font-bold text-teal-dark">Trips on the board</h2>
-            <p className="text-sm font-medium text-ink-soft">Every trip crews are planning right now — tap one to jump in.</p>
-            <ul className="mt-3 space-y-2">
+          <section>
+            <div className="flex items-baseline justify-between px-1">
+              <h2 className="font-display text-2xl font-extrabold tracking-tight text-ink">Trips on the board</h2>
+              <span className="text-xs font-bold text-ink-soft">{others.length} planning now</span>
+            </div>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
               {others.map((t) => (
-                <li key={t.slug}>
-                  <button
-                    onClick={() => router.push(`/t/${t.slug}`)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-cream-deep/70 px-4 py-3 text-left ring-1 ring-cream-edge/60 transition  hover:bg-cream-deep hover:shadow-card"
-                  >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white font-display text-lg font-bold text-coral shadow-sm">
-                      {t.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-display text-base font-bold text-teal-dark">{t.name}</span>
-                      <span className="block text-xs font-semibold text-ink-soft">
-                        {formatDate(t.startDate)} – {formatDate(t.endDate)}
-                        {t.location ? ` · ${t.location}` : ""}
-                        {t.attendeeCount > 0 ? ` · ${t.attendeeCount} in the crew` : ""}
+                <button
+                  key={t.slug}
+                  onClick={() => router.push(`/t/${t.slug}`)}
+                  className="card group overflow-hidden p-0 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lift"
+                >
+                  <div className={`relative bg-gradient-to-br ${coverGradient(t.slug)} px-5 pb-4 pt-5`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-display text-2xl font-extrabold leading-tight tracking-tight text-white">
+                        {t.name}
                       </span>
-                    </span>
-                    <ArrowRightIcon className="h-4 w-4 shrink-0 text-coral" />
-                  </button>
-                </li>
+                      <ArrowRightIcon className="mt-1 h-5 w-5 shrink-0 text-white/70 transition group-hover:translate-x-0.5 group-hover:text-white" />
+                    </div>
+                    {t.location && (
+                      <a
+                        href={mapsUrl(t.location)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-bold text-white/90 underline decoration-dotted underline-offset-2"
+                      >
+                        <PinIcon className="h-3.5 w-3.5 text-amber" /> {t.location}
+                      </a>
+                    )}
+                  </div>
+                  <div className="px-5 py-4">
+                    <div className="flex items-center gap-1.5 text-sm font-bold text-ink">
+                      <CalendarIcon className="h-4 w-4 shrink-0 text-coral" />
+                      {formatDate(t.startDate)} – {formatDate(t.endDate)}
+                    </div>
+                    <div className="mt-3">
+                      <CrewStack count={t.attendeeCount} />
+                    </div>
+                  </div>
+                </button>
               ))}
-            </ul>
+            </div>
           </section>
         )}
 
-        {/* ------- Create a trip ------- */}
-        <section className="card p-6">
-          <h2 className="font-display text-2xl font-bold text-teal-dark">Start a new adventure</h2>
-          <p className="mt-1 text-sm font-medium text-ink-soft">
-            Name it, place it, date it, share the link — that&apos;s the whole setup. Your crew does the rest.
-          </p>
-          <form onSubmit={createTrip} className="mt-5 space-y-4">
-            <div>
-              <label className="label-warm" htmlFor="trip-name">What&apos;s the trip called?</label>
-              <input
-                id="trip-name"
-                required
-                placeholder="e.g. Lake House Weekend"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="input-warm"
-              />
+        {/* ------- Start a trip (opens the sheet) ------- */}
+        <section className="card overflow-hidden p-0">
+          <div className="flex items-center gap-4 p-6">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-deep to-teal text-white shadow-teal">
+              <PaperPlaneIcon className="h-7 w-7" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">Start a new adventure</h2>
+              <p className="mt-0.5 text-sm font-medium text-ink-soft">
+                Name it, place it, date it, share the link — that&apos;s the whole setup.
+              </p>
             </div>
-            <div>
-              <label className="label-warm" htmlFor="organizer-name">And you are… (head honcho)</label>
-              <input
-                id="organizer-name"
-                placeholder="Your name"
-                required
-                value={form.organizerName}
-                onChange={(e) => setForm({ ...form, organizerName: e.target.value })}
-                className="input-warm"
-              />
-            </div>
-            <div>
-              <label className="label-warm" htmlFor="trip-location">Where to?</label>
-              <input
-                id="trip-location"
-                required
-                placeholder="e.g. Scottsdale, AZ"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                className="input-warm"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
-              <div>
-                <label className="label-warm" htmlFor="trip-start">Touchdown day</label>
-                <input
-                  id="trip-start"
-                  type="date"
-                  required
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  className="input-warm"
-                />
-              </div>
-              <div>
-                <label className="label-warm" htmlFor="trip-end">Heading home</label>
-                <input
-                  id="trip-end"
-                  type="date"
-                  required
-                  value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  className="input-warm"
-                />
-              </div>
-            </div>
-            {error && (
-              <p className="rounded-2xl bg-coral-soft px-4 py-2.5 text-sm font-bold text-coral-dark">{error}</p>
-            )}
-            <button type="submit" disabled={creating} className="btn-coral w-full py-3.5 text-lg">
-              {creating ? "Packing the bags…" : "Create trip & get my link"}
+            <button onClick={() => setShowCreate(true)} className="btn-coral hidden shrink-0 px-6 py-3 sm:block">
+              Create trip
             </button>
-          </form>
+          </div>
+          <button onClick={() => setShowCreate(true)} className="btn-coral mx-6 mb-6 w-[calc(100%-3rem)] py-3.5 text-base sm:hidden">
+            Create a trip
+          </button>
+        </section>
+
+        {/* ------- Organizer Pass pricing note (the one public place pricing appears)
+             HELD BACK from the Nov 17 legal-pages deploy (dpl_8JHVV59rQLdWY6SXAcRYNtNeq8bC):
+             deploy this ONLY together with MVP_PASS_ENABLED=1, once the Stripe
+             restricted key + webhook exist. ------- */}
+        <section className="card px-6 py-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-xl font-extrabold tracking-tight text-teal-dark">
+              ⭐ Organizer Pass
+            </h2>
+            <span className="font-display text-lg font-bold text-coral">
+              $19.99 <span className="text-xs font-extrabold text-ink-soft">one-time per trip</span>
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm font-medium leading-relaxed text-ink-soft">
+            Planning is free — the whole trip, forever. The optional pass is for the organizer who
+            wants the money tools: see who&rsquo;s actually paid each split, run a group fund for
+            the big shared costs, add co-organizers, pin an announcement, and lock the itinerary
+            when it&rsquo;s final. One payment, one trip, no subscription — and your crew never
+            pays anything. Refundable in full if the trip is cancelled before its start date.{" "}
+            <a href="/terms" className="font-bold text-teal-dark underline decoration-amber decoration-2 underline-offset-2">
+              Terms
+            </a>
+          </p>
         </section>
 
         <footer className="px-4 pb-2 pt-2 text-center">
-          <svg viewBox="0 0 220 12" className="mx-auto h-3 w-56 text-teal/30" aria-hidden>
-            <path d="M2 8 C 60 2, 160 12, 218 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="0.1 9" />
-          </svg>
-          <p className="mt-2 text-xs font-semibold text-ink-soft">
+          <p className="text-xs font-semibold text-ink-soft">
             MyVacaPlanner · the link is the key — share it only with your crew
+          </p>
+          <p className="mt-1.5 text-xs font-semibold text-ink-soft">
+            <a href="/terms" className="underline decoration-dotted underline-offset-2">Terms</a>
+            {" · "}
+            <a href="/privacy" className="underline decoration-dotted underline-offset-2">Privacy</a>
+            {" · "}
+            <a href="/refunds" className="underline decoration-dotted underline-offset-2">Refunds</a>
           </p>
         </footer>
       </div>
+
+      {/* ------- Create-trip sheet (modal on desktop, bottom sheet on mobile) ------- */}
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create a trip"
+        >
+          <button
+            aria-label="Close"
+            onClick={() => setShowCreate(false)}
+            className="absolute inset-0 bg-ink/50 backdrop-blur-sm"
+          />
+          <div className="tab-fade relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[28px] bg-white p-6 shadow-lift sm:rounded-[28px]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl font-extrabold tracking-tight text-teal-dark">Start a new adventure</h2>
+                <p className="mt-1 text-sm font-medium text-ink-soft">
+                  Name it, place it, date it, share the link — your crew does the rest.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCreate(false)}
+                aria-label="Close"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream-deep text-lg font-bold text-ink-soft transition hover:bg-cream-edge"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={createTrip} className="mt-5 space-y-4">
+              <div>
+                <label className="label-warm" htmlFor="trip-name">What&apos;s the trip called?</label>
+                <input
+                  id="trip-name"
+                  required
+                  autoFocus
+                  placeholder="e.g. Lake House Weekend"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="input-warm"
+                />
+              </div>
+              <div>
+                <label className="label-warm" htmlFor="organizer-name">And you are… (head honcho)</label>
+                <input
+                  id="organizer-name"
+                  placeholder="Your name"
+                  required
+                  value={form.organizerName}
+                  onChange={(e) => setForm({ ...form, organizerName: e.target.value })}
+                  className="input-warm"
+                />
+                {contactsOk && (
+                  <button
+                    type="button"
+                    onClick={fillOrganizerFromContacts}
+                    className="mt-2 text-sm font-bold text-teal-dark underline decoration-amber decoration-2 underline-offset-2"
+                  >
+                    📇 Pick from contacts
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="label-warm" htmlFor="trip-location">Where to?</label>
+                <input
+                  id="trip-location"
+                  required
+                  placeholder="e.g. Scottsdale, AZ"
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  className="input-warm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+                <div>
+                  <label className="label-warm" htmlFor="trip-start">Touchdown day</label>
+                  <input
+                    id="trip-start"
+                    type="date"
+                    required
+                    value={form.startDate}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                    className="input-warm"
+                  />
+                </div>
+                <div>
+                  <label className="label-warm" htmlFor="trip-end">Heading home</label>
+                  <input
+                    id="trip-end"
+                    type="date"
+                    required
+                    value={form.endDate}
+                    onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                    className="input-warm"
+                  />
+                </div>
+              </div>
+              {error && (
+                <p className="rounded-2xl bg-coral-soft px-4 py-2.5 text-sm font-bold text-coral-dark">{error}</p>
+              )}
+              <button type="submit" disabled={creating} className="btn-coral w-full py-3.5 text-lg">
+                {creating ? "Packing the bags…" : "Create trip & get my link"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

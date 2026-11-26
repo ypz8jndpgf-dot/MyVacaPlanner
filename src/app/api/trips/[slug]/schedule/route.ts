@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { isOrganizerId } from "@/lib/logic";
 import { newId, updateDB } from "@/lib/store";
-import type { ScheduleItem } from "@/lib/types";
+import type { ScheduleItem, Trip } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,16 @@ function canModify(
 ): boolean {
   const actor = trip.attendees.find((a) => a.id === actorId);
   return Boolean(actor && (actor.isOrganizer || item.createdBy === actorId));
+}
+
+/**
+ * Organizer Pass itinerary lock: exists only on pass trips (the flag
+ * that sets it lives behind the pass gate). While locked, schedule
+ * changes are organizer-only — co-organizers included. Unlocked and
+ * free trips behave exactly as before.
+ */
+function lockedForNonOrganizer(trip: Trip, actorId: string): boolean {
+  return Boolean(trip.pass && trip.itineraryLocked && !isOrganizerId(trip, actorId));
 }
 
 /** Add a schedule item. Any attendee. */
@@ -31,6 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
     if (!trip.attendees.some((a) => a.id === body.actorId)) return "forbidden" as const;
+    if (lockedForNonOrganizer(trip, body.actorId!)) return "locked" as const;
     const item: ScheduleItem = {
       id: newId("sch"),
       title: body.title!.trim(),
@@ -47,6 +59,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
   if (!result) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   if (result === "forbidden") return NextResponse.json({ error: "Join the trip first" }, { status: 403 });
+  if (result === "locked")
+    return NextResponse.json(
+      { error: "The itinerary is locked — only organizers can change the plan" },
+      { status: 403 }
+    );
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -70,7 +87,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     if (!trip) return null;
     const item = trip.schedule.find((s) => s.id === body.id);
     if (!item) return null;
-    if (!canModify(trip, item, body.actorId!)) return "forbidden" as const;
+    if (trip.pass && trip.itineraryLocked) {
+      if (!isOrganizerId(trip, body.actorId!)) return "locked" as const;
+    } else if (!canModify(trip, item, body.actorId!)) return "forbidden" as const;
     if (body.title?.trim()) item.title = body.title.trim();
     if (body.date) item.date = body.date;
     if (body.time !== undefined) item.time = body.time.trim() || undefined;
@@ -81,6 +100,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
 
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (result === "forbidden") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  if (result === "locked")
+    return NextResponse.json(
+      { error: "The itinerary is locked — only organizers can change the plan" },
+      { status: 403 }
+    );
   return NextResponse.json(result);
 }
 
@@ -96,12 +120,19 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
     if (!trip) return null;
     const item = trip.schedule.find((s) => s.id === body.id);
     if (!item) return null;
-    if (!canModify(trip, item, body.actorId!)) return "forbidden" as const;
+    if (trip.pass && trip.itineraryLocked) {
+      if (!isOrganizerId(trip, body.actorId!)) return "locked" as const;
+    } else if (!canModify(trip, item, body.actorId!)) return "forbidden" as const;
     trip.schedule = trip.schedule.filter((s) => s.id !== body.id);
     return { trip };
   });
 
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (result === "forbidden") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  if (result === "locked")
+    return NextResponse.json(
+      { error: "The itinerary is locked — only organizers can change the plan" },
+      { status: 403 }
+    );
   return NextResponse.json(result);
 }

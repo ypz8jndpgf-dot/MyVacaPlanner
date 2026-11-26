@@ -85,6 +85,27 @@ export function mapsUrl(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+/* ---- Destination covers (facelift 2026-11-16) ---- */
+
+/* Deep, imagery-forward gradients for trip covers — one per trip,
+ * picked deterministically from the slug so a trip always keeps its
+ * cover. All stay inside the brand family (ink-teal base, coral /
+ * amber / lagoon accents). */
+const COVER_GRADIENTS = [
+  "from-[#052E36] via-[#0B5563] to-[#0E6B7A]",
+  "from-[#2A1B3D] via-[#0B5563] to-[#0E6B7A]",
+  "from-[#052E36] via-[#14524B] to-[#2F7A5E]",
+  "from-[#3D1E1B] via-[#7A2E22] to-[#C4503F]",
+  "from-[#052E36] via-[#0E4A5E] to-[#2F6F79]",
+  "from-[#1B2A3D] via-[#0B5563] to-[#3E7A72]",
+];
+
+export function coverGradient(key: string): string {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return COVER_GRADIENTS[hash % COVER_GRADIENTS.length];
+}
+
 export function SunIcon({ className = "h-5 w-5" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className={className} aria-hidden>
@@ -210,4 +231,42 @@ export function EmptyState({
       {children}
     </div>
   );
+}
+
+/* ---------------- Contact Picker (phone contacts) ----------------
+   The Contact Picker API is user-driven by design: the OS picker only
+   opens from a tap, and the page only ever receives the names the user
+   picked — no silent contacts access. Available in Android Chrome (and
+   Safari behind a flag); everywhere else these helpers simply report
+   "unavailable" and callers hide the button entirely. */
+
+type ContactPickerContact = { name?: string[] };
+type ContactsManagerLike = {
+  select: (properties: string[], options?: { multiple?: boolean }) => Promise<ContactPickerContact[]>;
+};
+
+/** True only where navigator.contacts.select actually exists. */
+export function contactsPickerAvailable(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    "contacts" in navigator &&
+    typeof window !== "undefined" &&
+    "ContactsManager" in window
+  );
+}
+
+/** Open the OS contact picker and return the picked display names
+ *  (trimmed, non-empty). Must be called from a user-gesture handler.
+ *  Rejects if the user dismisses the picker — callers treat that as a
+ *  silent no-op. */
+export async function pickContactNames(multiple: boolean): Promise<string[]> {
+  const contacts = (navigator as Navigator & { contacts?: ContactsManagerLike }).contacts;
+  if (!contacts) return [];
+  const picked = await contacts.select(["name"], { multiple });
+  const names: string[] = [];
+  for (const c of picked ?? []) {
+    const n = c.name?.find((x) => x && x.trim());
+    if (n && n.trim()) names.push(n.trim());
+  }
+  return names;
 }

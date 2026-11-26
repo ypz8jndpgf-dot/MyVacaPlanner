@@ -11,6 +11,7 @@ const FIELDS = [
   "checkOut",
   "accessCode",
   "wifi",
+  "wifiPassword",
   "contact",
   "url",
   "notes",

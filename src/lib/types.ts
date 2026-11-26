@@ -39,6 +39,17 @@ export interface Flight {
   createdAt: number;
 }
 
+/** How an attendee's share was actually paid (Organizer Pass tracking). */
+export type SharePaymentMethod = "venmo" | "cashapp" | "card" | "cash";
+
+/** One attendee's recorded payment toward one expense share, or toward
+ *  the group fund. A share is either marked paid (whole share) or not. */
+export interface SharePayment {
+  paidAt: number;
+  method: SharePaymentMethod;
+  txnRef?: string;
+}
+
 export interface Expense {
   id: string;
   description: string;
@@ -48,6 +59,31 @@ export interface Expense {
   date: string; // YYYY-MM-DD
   createdBy: string; // attendee id
   createdAt: number;
+  /** Organizer Pass paid-up tracking: attendee id -> share payment mark.
+   *  Absent on free trips and on expenses logged before the pass. */
+  payments?: Record<string, SharePayment>;
+}
+
+/** Organizer Pass purchase record (one-time per trip, set by the Stripe
+ *  webhook only — never trusted from a client or a redirect). */
+export interface TripPass {
+  purchasedAt: number;
+  byName: string; // organizer attendee name at purchase time
+  stripeSessionId: string;
+}
+
+/** Group fund: a flat per-person amount the crew chips in (house deposit,
+ *  tee times…). Tracked against `fundPayments` on the trip. */
+export interface TripFund {
+  label: string;
+  perPersonCents: number;
+}
+
+/** Pinned organizer announcement, shown at the top of the Plan tab. */
+export interface TripAnnouncement {
+  text: string;
+  byName: string;
+  at: number;
 }
 
 export interface ShoppingItem {
@@ -108,7 +144,9 @@ export interface LodgingInfo {
   checkOut?: string;
   /** Door / gate / lockbox code. */
   accessCode?: string;
+  /** Wi-Fi network name. */
   wifi?: string;
+  wifiPassword?: string;
   /** Host or front-desk contact. */
   contact?: string;
   /** Listing / booking link (Airbnb, hotel, …). */
@@ -134,6 +172,20 @@ export interface Trip {
   shopping: ShoppingItem[];
   polls: Poll[];
   packing: PackingItem[];
+  /* ---- Organizer Pass (all optional; absent on free trips) ---- */
+  /** Set by the Stripe webhook when the one-time pass is purchased. */
+  pass?: TripPass;
+  /** Attendee ids with organizer powers, creator first. When absent,
+   *  derived from attendees' isOrganizer flags (see organizerIds()). */
+  organizers?: string[];
+  /** Group fund definition; payments tracked in fundPayments. */
+  fund?: TripFund;
+  /** Fund paid marks: attendee id -> payment mark. */
+  fundPayments?: Record<string, SharePayment>;
+  /** Pinned announcement at the top of the Plan tab. */
+  announcement?: TripAnnouncement;
+  /** When true, only organizers may add/edit/delete schedule items. */
+  itineraryLocked?: boolean;
 }
 
 export interface DB {
