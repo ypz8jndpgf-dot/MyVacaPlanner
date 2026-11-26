@@ -210,8 +210,8 @@ export default function TripClient({ slug }: { slug: string }) {
             {inCount} in · {trip.attendees.length} in the crew
           </span>
           {passOn && trip.pass && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1.5 text-teal-deep ring-1 ring-white/30">
-              ⭐ Organizer Pass
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber via-amber to-amber-dark px-3 py-1.5 font-extrabold text-teal-deep shadow-md ring-1 ring-white/50">
+              ⭐ Organizer Pass · Premium
             </span>
           )}
           {passOn && !trip.pass && me?.isOrganizer && (
@@ -2386,15 +2386,43 @@ function PassControlsCard({
  */
 /* Header pill-button: the Organizer Pass unlock, visible on every tab for a
    claimed organizer whose trip has no pass yet. Pulses softly (pass-pulse)
-   so it's findable; one tap goes straight to Stripe checkout. Attendees and
+   so it's findable. Tapping it opens the benefits pop-up (PassBenefitsModal);
+   checkout happens only from the pop-up's Continue button. Attendees and
    unclaimed viewers never see it — pricing stays organizer-only. */
 function PassHeaderButton({ slug, actorId }: { slug: string; actorId: string }) {
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  async function unlock() {
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="pass-pulse inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1.5 text-teal-deep ring-1 ring-white/30"
+      >
+        ⭐ Unlock Organizer Pass · $19.99
+      </button>
+      {open && <PassBenefitsModal slug={slug} actorId={actorId} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/* Benefits pop-up for the Organizer Pass: what the pass adds, the one-time
+   price, and an explicit Continue to checkout (Stripe) or Not now. Shown
+   before any payment step so the value lands before the card form does. */
+function PassBenefitsModal({
+  slug,
+  actorId,
+  onClose,
+}: {
+  slug: string;
+  actorId: string;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function checkout() {
     setBusy(true);
-    setFailed(false);
+    setMsg("");
     try {
       const res = await fetch(`/api/trips/${slug}/pass/checkout`, {
         method: "POST",
@@ -2410,22 +2438,67 @@ function PassHeaderButton({ slug, actorId }: { slug: string; actorId: string }) 
         window.location.reload();
         return;
       }
-      setFailed(true);
+      setMsg((data.message as string) ?? (data.error as string) ?? "Checkout didn't open — try again in a moment.");
     } catch {
-      setFailed(true);
+      setMsg("Checkout didn't open — try again in a moment.");
     } finally {
       setBusy(false);
     }
   }
 
+  const benefits = [
+    "See who's actually paid each split — no more chasing Venmo screenshots",
+    "Run a group fund for the big shared costs (house, boat, tickets)",
+    "Add co-organizers so you're not the only one herding cats",
+    "Pin an announcement the whole crew sees first",
+    "Lock the itinerary once it's final",
+  ];
+
   return (
-    <button
-      onClick={unlock}
-      disabled={busy}
-      className="pass-pulse inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1.5 text-teal-deep ring-1 ring-white/30 disabled:opacity-60"
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Organizer Pass benefits"
+      onClick={onClose}
     >
-      ⭐ {busy ? "Opening checkout…" : failed ? "Tap to retry — Organizer Pass $19.99" : "Unlock Organizer Pass · $19.99"}
-    </button>
+      <div
+        className="tab-fade w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h3 className="font-display text-2xl font-extrabold tracking-tight text-teal-deep">
+            ⭐ Organizer Pass
+          </h3>
+          <span className="shrink-0 font-display text-xl font-bold text-teal-deep">
+            $19.99 <span className="text-xs font-extrabold text-ink-soft">one-time</span>
+          </span>
+        </div>
+        <p className="mt-1 text-sm font-semibold text-ink-soft">
+          Your trip works fully without it — the pass adds the organizer&apos;s money tools:
+        </p>
+        <ul className="mt-4 space-y-2.5">
+          {benefits.map((b) => (
+            <li key={b} className="flex gap-2.5 text-sm font-semibold text-ink">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal text-[11px] font-extrabold text-white">
+                ✓
+              </span>
+              <span>{b}</span>
+            </li>
+          ))}
+        </ul>
+        <button onClick={checkout} disabled={busy} className="btn-amber mt-5 w-full py-3 disabled:opacity-60">
+          {busy ? "Opening secure checkout…" : "Continue to checkout · $19.99"}
+        </button>
+        {msg && <p className="mt-2.5 text-center text-xs font-bold text-red-700">{msg}</p>}
+        <button onClick={onClose} disabled={busy} className="mt-2 w-full py-2 text-sm font-bold text-ink-soft disabled:opacity-60">
+          Not now
+        </button>
+        <p className="mt-1 text-center text-[11px] font-semibold text-ink-soft/80">
+          One payment, this trip only. No subscription, no charges for your crew. Secure checkout by Stripe.
+        </p>
+      </div>
+    </div>
   );
 }
 
