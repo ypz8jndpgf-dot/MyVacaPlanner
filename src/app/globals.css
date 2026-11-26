@@ -117,6 +117,11 @@ a:focus-visible {
   .pass-pulse {
     animation: passPulse 2.2s ease-out infinite;
   }
+  /* Claim-your-name panel: same pulse language as the pass CTA — the two
+     steps nobody should miss share one visual signal. */
+  .claim-pulse {
+    animation: passPulse 2.2s ease-out infinite;
+  }
   @keyframes passPulse {
     0% {
       box-shadow: 0 0 0 0 rgba(245, 185, 63, 0.55);
@@ -129,7 +134,8 @@ a:focus-visible {
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .pass-pulse {
+    .pass-pulse,
+    .claim-pulse {
       animation: none;
     }
   }

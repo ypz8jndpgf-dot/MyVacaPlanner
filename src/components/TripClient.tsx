@@ -403,20 +403,28 @@ function JoinCard({
       <div className="p-5">
         {attendees.length > 0 && (
           <>
-            <p className="text-sm font-semibold text-ink-soft">Already on the list? Tap your name:</p>
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {attendees.map((a) => (
-                <button
-                  key={a.id}
-                  disabled={busy}
-                  onClick={() => join(a.rsvp, a.name)}
-                  className="inline-flex items-center gap-2 rounded-full bg-cream-deep py-1 pl-1 pr-3.5 font-display text-sm font-bold text-teal-dark shadow-sm ring-1 ring-cream-edge transition  hover:ring-amber disabled:opacity-50"
-                >
-                  <Avatar name={a.name} size="sm" />
-                  {a.name}
-                  {a.isOrganizer && <span className="text-amber-dark">★</span>}
-                </button>
-              ))}
+            <div className="claim-pulse rounded-2xl bg-amber/15 p-4 ring-2 ring-amber">
+              <p className="font-display text-lg font-extrabold leading-snug text-teal-deep">
+                👆 Already on the list? Tap your name — that&apos;s your key in
+              </p>
+              <p className="mt-1 text-sm font-semibold text-ink-soft">
+                No password, no account. Tapping your name unlocks your spot, your splits, and the
+                organizer tools.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {attendees.map((a) => (
+                  <button
+                    key={a.id}
+                    disabled={busy}
+                    onClick={() => join(a.rsvp, a.name)}
+                    className="inline-flex items-center gap-2 rounded-full bg-white py-1.5 pl-1.5 pr-4 font-display text-base font-bold text-teal-dark shadow ring-2 ring-amber transition hover:bg-amber/20 disabled:opacity-50"
+                  >
+                    <Avatar name={a.name} size="sm" />
+                    {a.name}
+                    {a.isOrganizer && <span className="text-amber-dark">★</span>}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="my-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-widest text-ink-soft/70">
               <span className="h-px flex-1 bg-cream-edge" /> New here? <span className="h-px flex-1 bg-cream-edge" />
