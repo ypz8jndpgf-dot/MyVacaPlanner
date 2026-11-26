@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorGate, getSessionEmail, organizerGate, VERIFY_MSG } from "@/lib/auth";
 import { newId, updateDB } from "@/lib/store";
 import type { Payment } from "@/lib/types";
 
@@ -28,12 +29,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     );
   }
 
+  const session = await getSessionEmail();
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
     const ids = new Set(trip.attendees.map((a) => a.id));
     if (!ids.has(body.actorId!) || !ids.has(body.fromId!) || !ids.has(body.toId!))
       return "forbidden" as const;
+    if (actorGate(trip, body.actorId, session) === "verify") return "verify" as const;
     const payment: Payment = {
       id: newId("pay"),
       fromId: body.fromId!,
@@ -48,6 +51,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (!result) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   if (result === "forbidden")
     return NextResponse.json({ error: "Everyone involved must be a trip attendee" }, { status: 403 });
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -57,12 +62,14 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
   const body = (await req.json().catch(() => null)) as { id?: string; actorId?: string } | null;
   if (!body?.id || !body.actorId)
     return NextResponse.json({ error: "id and actorId are required" }, { status: 400 });
+  const session = await getSessionEmail();
 
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
-    const actor = trip.attendees.find((a) => a.id === body.actorId);
-    if (!actor?.isOrganizer) return "forbidden" as const;
+    const gate = organizerGate(trip, body.actorId, session);
+    if (gate === "verify") return "verify" as const;
+    if (gate) return "forbidden" as const;
     trip.payments = trip.payments.filter((p) => p.id !== body.id);
     return { trip };
   });
@@ -70,5 +77,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (result === "forbidden")
     return NextResponse.json({ error: "Only the organizer can undo a payment" }, { status: 403 });
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result);
 }

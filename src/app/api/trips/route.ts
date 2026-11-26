@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionEmail, VERIFY_MSG } from "@/lib/auth";
 import { cleanEmail } from "@/lib/email";
 import { loadDB, makeSlug, newId, updateDB } from "@/lib/store";
 import type { Trip } from "@/lib/types";
@@ -67,6 +68,12 @@ export async function POST(req: Request) {
       { error: "A valid organizer email is required.", code: "EMAIL_REQUIRED" },
       { status: 400 }
     );
+  }
+  // The organizer must be verified as that email (one emailed code) before
+  // a trip can be created under it — otherwise anyone could spin up trips
+  // wearing someone else's identity.
+  if ((await getSessionEmail()) !== organizerEmail) {
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   }
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   if (!DATE_RE.test(body.startDate) || !DATE_RE.test(body.endDate)) {

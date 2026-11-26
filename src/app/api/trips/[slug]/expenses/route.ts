@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorGate, getSessionEmail, VERIFY_MSG } from "@/lib/auth";
 import { newId, updateDB } from "@/lib/store";
 import type { Expense } from "@/lib/types";
 
@@ -31,11 +32,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     );
   }
 
+  const session = await getSessionEmail();
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
     const ids = new Set(trip.attendees.map((a) => a.id));
     if (!ids.has(body.actorId!) || !ids.has(body.paidBy!)) return "forbidden" as const;
+    if (actorGate(trip, body.actorId, session) === "verify") return "verify" as const;
     const split = [...new Set(body.splitAmong!)].filter((id) => ids.has(id));
     if (split.length === 0) return "forbidden" as const;
     const expense: Expense = {
@@ -55,6 +58,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (!result) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   if (result === "forbidden")
     return NextResponse.json({ error: "Payer and split members must be trip attendees" }, { status: 403 });
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -64,6 +69,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
   const body = (await req.json().catch(() => null)) as { id?: string; actorId?: string } | null;
   if (!body?.id || !body.actorId)
     return NextResponse.json({ error: "id and actorId are required" }, { status: 400 });
+  const session = await getSessionEmail();
 
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
@@ -73,11 +79,14 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
     const actor = trip.attendees.find((a) => a.id === body.actorId);
     if (!actor || (!actor.isOrganizer && expense.createdBy !== body.actorId))
       return "forbidden" as const;
+    if (actorGate(trip, body.actorId, session) === "verify") return "verify" as const;
     trip.expenses = trip.expenses.filter((e) => e.id !== body.id);
     return { trip };
   });
 
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (result === "forbidden") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result);
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorGate, getSessionEmail, VERIFY_MSG } from "@/lib/auth";
 import { isOrganizerId } from "@/lib/logic";
 import { passGate } from "@/lib/pass";
 import { updateDB } from "@/lib/store";
@@ -59,6 +60,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const body = (await req.json().catch(() => null)) as Body | null;
   if (!body?.actorId || !body.action)
     return NextResponse.json({ error: "actorId and action are required" }, { status: 400 });
+  const session = await getSessionEmail();
 
   const result: PassResult = await updateDB((db): PassResult => {
     const trip = db.trips.find((t) => t.slug === slug);
@@ -69,6 +71,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
 
     const actor = trip.attendees.find((a) => a.id === body.actorId);
     if (!actor) return FORBIDDEN;
+    if (actorGate(trip, body.actorId, session) === "verify")
+      return { kind: "gate", status: 403, error: VERIFY_MSG };
     const organizer = isOrganizerId(trip, body.actorId);
     const attendeeIds = new Set(trip.attendees.map((a) => a.id));
 

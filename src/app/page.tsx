@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { formatDate } from "@/lib/logic";
+import { cleanEmail } from "@/lib/email";
+import VerifyEmail from "@/components/VerifyEmail";
 import {
   ArrowRightIcon,
   CalendarIcon,
@@ -70,6 +72,22 @@ export default function HomePage() {
   useEffect(() => {
     setContactsOk(contactsPickerAvailable());
   }, []);
+
+  // Verified identity on this device (passwordless email session). Creating
+  // a trip requires the session to match the organizer email, so a trip can
+  // only ever be born under its real organizer's verified identity.
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        const em = d?.email ?? null;
+        setSessionEmail(em);
+        if (em) setForm((f) => (f.organizerEmail ? f : { ...f, organizerEmail: em }));
+      })
+      .catch(() => {});
+  }, []);
+  const organizerVerified = Boolean(sessionEmail) && sessionEmail === cleanEmail(form.organizerEmail);
 
   async function fillOrganizerFromContacts() {
     try {
@@ -436,6 +454,24 @@ export default function HomePage() {
                 <p className="mt-1 text-xs font-semibold text-ink-soft">
                   Trip updates only — announcements and upgrades. Never marketing, never shared.
                 </p>
+                {organizerVerified ? (
+                  <p className="mt-2 rounded-2xl bg-teal-mist px-4 py-2.5 text-sm font-bold text-teal-dark">
+                    ✓ Verified — this inbox is your key. Nobody can create or run a trip as you
+                    without it.
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <VerifyEmail
+                      key={form.organizerEmail}
+                      initialEmail={form.organizerEmail}
+                      onVerified={(em) => {
+                        setSessionEmail(em);
+                        setForm((f) => ({ ...f, organizerEmail: em }));
+                      }}
+                      cta="Verify my email"
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="label-warm" htmlFor="trip-location">Where to?</label>
@@ -475,8 +511,8 @@ export default function HomePage() {
               {error && (
                 <p className="rounded-2xl bg-coral-soft px-4 py-2.5 text-sm font-bold text-coral-dark">{error}</p>
               )}
-              <button type="submit" disabled={creating} className="btn-coral w-full py-3.5 text-lg">
-                {creating ? "Packing the bags…" : "Create trip & get my link"}
+              <button type="submit" disabled={creating || !organizerVerified} className="btn-coral w-full py-3.5 text-lg disabled:opacity-50">
+                {creating ? "Packing the bags…" : organizerVerified ? "Create trip & get my link" : "Verify your email to create the trip"}
               </button>
             </form>
           </div>

@@ -177,3 +177,46 @@ export async function getTrip(slug: string): Promise<Trip | null> {
 export function storageBackend(): string {
   return useRedis ? "upstash-redis" : "local-json-file";
 }
+
+// ---------- raw key helpers (auth codes etc.) ----------
+
+/** Read an arbitrary string key from the same backend (null when absent). */
+export async function rawGet(key: string): Promise<string | null> {
+  if (useRedis) {
+    const res = await fetch(`${redisUrl}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${redisToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Redis GET failed: ${res.status}`);
+    const data = (await res.json()) as { result: string | null };
+    return data.result;
+  }
+  const fs = await import("fs/promises");
+  const path = await import("path");
+  try {
+    return await fs.readFile(path.join(process.cwd(), "data", `${key.replace(/[^a-z0-9]+/gi, "_")}.json`), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** Write an arbitrary string key (command-style SET on Redis). */
+export async function rawSet(key: string, value: string): Promise<void> {
+  if (useRedis) {
+    const res = await fetch(`${redisUrl}/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${redisToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(["SET", key, value]),
+    });
+    if (!res.ok) throw new Error(`Redis SET failed: ${res.status}`);
+    const data = (await res.json()) as { result?: string; error?: string };
+    if (data.error || data.result !== "OK")
+      throw new Error(`Redis SET failed: ${data.error ?? "unexpected result"}`);
+    return;
+  }
+  const fs = await import("fs/promises");
+  const path = await import("path");
+  const dir = path.join(process.cwd(), "data");
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, `${key.replace(/[^a-z0-9]+/gi, "_")}.json`), value, "utf8");
+}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionEmail, VERIFY_MSG } from "@/lib/auth";
 import { isOrganizerId } from "@/lib/logic";
 import { PASS_PRICE_CENTS, passEnabled, passStripeSecret, tripHasPass } from "@/lib/pass";
 import { getTrip } from "@/lib/store";
@@ -45,6 +46,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       { error: "Only the trip organizer can unlock the pass" },
       { status: 403 }
     );
+  // The buyer must be verified as the organizer's email — a forwarded link
+  // can't check out a pass wearing the organizer's name.
+  {
+    const organizer = trip.attendees.find((a) => a.id === body.actorId);
+    if (organizer?.email && (await getSessionEmail()) !== organizer.email)
+      return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
+  }
   if (tripHasPass(trip)) return NextResponse.json({ ok: true, alreadyPurchased: true });
 
   const secret = passStripeSecret();

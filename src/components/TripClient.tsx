@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Attendee, Expense, Flight, LodgingInfo, PackingItem, Poll, Rsvp, ScheduleItem, SharePayment, SharePaymentMethod, ShoppingItem, Trip } from "@/lib/types";
-import { cleanEmail } from "@/lib/email";
+import VerifyEmail from "@/components/VerifyEmail";
 import { computeBalances, dateRange, formatDate, formatMoney, formatTime, organizerIds, settleUp, shareCentsFor } from "@/lib/logic";
 import {
   ArrowRightIcon,
@@ -53,6 +53,16 @@ export default function TripClient({ slug }: { slug: string }) {
   // via /api/config). While false, no pass UI renders anywhere — the
   // trip experience is exactly the pre-pass one.
   const [passOn, setPassOn] = useState(false);
+  // Verified identity on this device (passwordless email session). Null
+  // until /api/auth/me answers or a verify completes.
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setSessionEmail(d?.email ?? null))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -255,11 +265,29 @@ export default function TripClient({ slug }: { slug: string }) {
 
       {me && me.isOrganizer && <TripDetailsEditor trip={trip} me={me} mutate={mutate} />}
 
+      {me && me.email && sessionEmail !== me.email && (
+        <section className="card mt-5 p-5 ring-2 ring-amber">
+          <p className="font-display text-lg font-extrabold leading-snug text-teal-deep">
+            🔐 Quick check — is this still you?
+          </p>
+          <p className="mt-1 text-sm font-semibold text-ink-soft">
+            You&apos;re on this trip as {me.name} ({me.email}), but this device isn&apos;t verified yet.
+            Money and organizer tools stay locked until you enter one emailed code — then this device
+            is trusted for months.
+          </p>
+          <div className="mt-3">
+            <VerifyEmail initialEmail={me.email} onVerified={(em) => setSessionEmail(em)} />
+          </div>
+        </section>
+      )}
+
       {!me && (
         <JoinCard
           slug={slug}
           tripName={trip.name}
           attendees={trip.attendees}
+          sessionEmail={sessionEmail}
+          onSession={setSessionEmail}
           onAdded={load}
           onJoined={(attendee) => {
             localStorage.setItem(`mvp:me:${slug}`, attendee.id);
@@ -316,23 +344,31 @@ function ShareButton({ slug }: { slug: string }) {
   );
 }
 
+function maskEmail(e: string): string {
+  return e.replace(/^(.).*(@.*)$/, "$1•••$2");
+}
+
 function JoinCard({
   slug,
   tripName,
   attendees,
+  sessionEmail,
+  onSession,
   onJoined,
   onAdded,
 }: {
   slug: string;
   tripName: string;
   attendees: Attendee[];
+  sessionEmail: string | null;
+  onSession: (email: string) => void;
   onJoined: (a: Attendee) => void;
   onAdded?: () => void;
 }) {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  // A listed name with no email on file yet: tapping it starts a claim that
-  // completes only once a valid email is entered (email is mandatory).
+  // The listed name being claimed, when a claim needs a verify step first:
+  // either the name is linked to an email this device hasn't proven, or it
+  // has no email yet and this device isn't verified at all.
   const [claimFor, setClaimFor] = useState<Attendee | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -344,7 +380,7 @@ function JoinCard({
     setContactsOk(contactsPickerAvailable());
   }, []);
 
-  async function join(rsvp: Rsvp, joinName: string, joinEmail?: string) {
+  async function join(rsvp: Rsvp, joinName: string) {
     if (!joinName.trim()) return;
     setBusy(true);
     setError("");
@@ -352,7 +388,6 @@ function JoinCard({
       const data = await api(`/api/trips/${slug}/attendees`, "POST", {
         name: joinName.trim(),
         rsvp,
-        ...(joinEmail ? { email: joinEmail } : {}),
       });
       onJoined(data.attendee);
     } catch (e) {
@@ -362,10 +397,11 @@ function JoinCard({
     }
   }
 
-  /** Tap-a-name: instant when the record already has an email; otherwise it
-   *  opens the email step inside the claim panel first. */
+  /** Tap-a-name: instant when this device is verified as the name's email
+   *  (or the name has no email and this device is verified — the claim binds
+   *  it). Otherwise the claim panel runs the one-time email check first. */
   function tapName(a: Attendee) {
-    if (a.email) {
+    if (sessionEmail && (!a.email || a.email === sessionEmail)) {
       void join(a.rsvp, a.name);
     } else {
       setClaimFor(a);
@@ -417,7 +453,7 @@ function JoinCard({
       <div className="bg-gradient-to-br from-teal-deep via-teal to-teal-light px-6 py-5">
         <h2 className="font-display text-2xl font-extrabold tracking-tight text-white">You&apos;re invited to {tripName} 🎉</h2>
         <p className="mt-1 text-sm font-bold text-teal-mist/90">
-          No account, no fuss — just claim your spot on the crew list.
+          No password, no account — one quick email check proves it&apos;s you, then claim your spot.
         </p>
       </div>
       <div className="p-5">
@@ -428,8 +464,8 @@ function JoinCard({
                 👆 Already on the list? Tap your name — that&apos;s your key in
               </p>
               <p className="mt-1 text-sm font-semibold text-ink-soft">
-                No password, no account. Tapping your name unlocks your spot, your splits, and the
-                organizer tools.
+                Tapping your name unlocks your spot, your splits, and the organizer tools — a
+                one-time email code makes sure it&apos;s really you.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {attendees.map((a) => (
@@ -449,30 +485,63 @@ function JoinCard({
               </div>
               {claimFor && (
                 <div className="mt-3 rounded-xl bg-white/80 p-3 ring-1 ring-amber">
-                  <label className={labelCls} htmlFor="claim-email">
-                    Claiming {claimFor.name} — your email (required)
-                  </label>
-                  <input
-                    id="claim-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={inputCls}
-                  />
-                  <button
-                    disabled={busy || !cleanEmail(email)}
-                    onClick={() => {
-                      const em = cleanEmail(email);
-                      if (em && claimFor) void join(claimFor.rsvp, claimFor.name, em);
-                    }}
-                    className="btn-coral mt-2.5 w-full py-2.5 disabled:opacity-50"
-                  >
-                    Claim my spot 🙌
-                  </button>
-                  <p className="mt-1.5 text-center text-[11px] font-semibold text-ink-soft">
-                    Trip updates only — never marketing, never shared outside this trip.
-                  </p>
+                  {claimFor.email ? (
+                    <>
+                      <p className="text-sm font-bold text-teal-dark">
+                        {claimFor.name} is linked to {maskEmail(claimFor.email)} 🔐
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-ink-soft">
+                        If that&apos;s you, one emailed code proves it — then this device stays
+                        trusted. Someone else&apos;s name can&apos;t be claimed without their inbox.
+                      </p>
+                      <div className="mt-2">
+                        <VerifyEmail
+                          key={claimFor.id}
+                          initialEmail={claimFor.email}
+                          onVerified={(em) => {
+                            onSession(em);
+                            if (em === claimFor.email) void join(claimFor.rsvp, claimFor.name);
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : sessionEmail ? (
+                    <>
+                      <p className="text-sm font-bold text-teal-dark">
+                        Link {sessionEmail} to {claimFor.name}?
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-ink-soft">
+                        You&apos;re verified as {sessionEmail}. Claiming makes it {claimFor.name}
+                        &apos;s email for this trip — future claims will need that inbox.
+                      </p>
+                      <button
+                        disabled={busy}
+                        onClick={() => void join(claimFor.rsvp, claimFor.name)}
+                        className="btn-coral mt-2.5 w-full py-2.5 disabled:opacity-50"
+                      >
+                        Claim my spot 🙌
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-teal-dark">
+                        Claiming {claimFor.name} — one quick email check
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-ink-soft">
+                        Your email becomes {claimFor.name}&apos;s key for this trip — announcements
+                        reach you, and nobody else can claim your name without your inbox.
+                      </p>
+                      <div className="mt-2">
+                        <VerifyEmail
+                          key={claimFor.id}
+                          onVerified={(em) => {
+                            onSession(em);
+                            void join(claimFor.rsvp, claimFor.name);
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -489,18 +558,16 @@ function JoinCard({
           onChange={(e) => setName(e.target.value)}
           className={inputCls}
         />
-        <label className={`${labelCls} mt-3 block`} htmlFor="join-email">Your email (required)</label>
-        <input
-          id="join-email"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={inputCls}
-        />
-        <p className="mt-1 text-[11px] font-semibold text-ink-soft">
-          It&apos;s how this trip reaches you — announcements and upgrades. Never marketing, never shared.
-        </p>
+        {sessionEmail ? (
+          <p className="mt-3 rounded-2xl bg-teal-mist px-4 py-2.5 text-sm font-bold text-teal-dark">
+            ✓ Verified as {sessionEmail} — that&apos;s your key on every trip.
+          </p>
+        ) : (
+          <div className="mt-3">
+            <span className={labelCls}>Your email — one quick check, no password</span>
+            <VerifyEmail onVerified={onSession} />
+          </div>
+        )}
         {contactsOk && (
           <button
             type="button"
@@ -513,15 +580,15 @@ function JoinCard({
         )}
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
-            disabled={busy || !name.trim() || !cleanEmail(email)}
-            onClick={() => join("in", name, cleanEmail(email) ?? undefined)}
+            disabled={busy || !name.trim() || !sessionEmail}
+            onClick={() => join("in", name)}
             className="btn-coral py-3"
           >
             I&apos;m in 🙌
           </button>
           <button
-            disabled={busy || !name.trim() || !cleanEmail(email)}
-            onClick={() => join("out", name, cleanEmail(email) ?? undefined)}
+            disabled={busy || !name.trim() || !sessionEmail}
+            onClick={() => join("out", name)}
             className="btn-ghost py-3"
           >
             Can&apos;t make it

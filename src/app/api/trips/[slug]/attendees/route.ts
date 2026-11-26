@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { actorGate, getSessionEmail, organizerGate, VERIFY_MSG } from "@/lib/auth";
 import { cleanEmail } from "@/lib/email";
 import { newId, updateDB } from "@/lib/store";
 import type { Attendee, Rsvp } from "@/lib/types";
@@ -24,6 +25,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   if (!body?.name?.trim())
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   const email = cleanEmail(body.email);
+  // Identity (Nov 26, 2026): joining or claiming requires a verified email
+  // session. The session email — never the request body — is what binds to
+  // the attendee record. Names added by someone else stay email-less shells
+  // until their owner claims them with a verified session.
+  const session = await getSessionEmail();
 
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
@@ -33,17 +39,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       (a) => a.name.trim().toLowerCase() === body.name!.trim().toLowerCase()
     );
     if (existing) {
-      if (!existing.email) {
-        // Legacy (pre-email) record: claiming it requires an email.
-        if (!email) return "email-required" as const;
-        existing.email = email;
-      } else if (email) {
-        existing.email = email; // let a claim correct a typo'd address
+      if (existing.email) {
+        if (session !== existing.email) return "verify" as const;
+      } else {
+        if (!session) return "verify" as const;
+        existing.email = session;
       }
       if (body.rsvp) existing.rsvp = body.rsvp;
       return { attendee: existing, trip };
     }
-    if (!email && !body.addedByOther) return "email-required" as const;
+    if (!body.addedByOther) {
+      if (!session) return "verify" as const;
+      const attendee: Attendee = {
+        id: newId("att"),
+        name: body.name!.trim(),
+        rsvp: body.rsvp ?? "in",
+        isOrganizer: false,
+        createdAt: Date.now(),
+        email: session,
+      };
+      trip.attendees.push(attendee);
+      return { attendee, trip };
+    }
     const attendee: Attendee = {
       id: newId("att"),
       name: body.name!.trim(),
@@ -57,11 +74,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   });
 
   if (!result) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
-  if (result === "email-required")
-    return NextResponse.json(
-      { error: "A valid email is required — it's how this trip reaches you.", code: "EMAIL_REQUIRED" },
-      { status: 400 }
-    );
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -89,6 +103,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
   } | null;
   if (!body?.id || !body.actorId)
     return NextResponse.json({ error: "id and actorId are required" }, { status: 400 });
+  const session = await getSessionEmail();
 
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
@@ -96,12 +111,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     const actor = trip.attendees.find((a) => a.id === body.actorId);
     if (!actor) return "forbidden" as const;
     if (body.actorId !== body.id && !actor.isOrganizer) return "forbidden" as const;
+    // An actor with an email on file must be verified as themselves; an
+    // email can only be set to the verified session email.
+    if (actorGate(trip, body.actorId, session) === "verify") return "verify" as const;
     const target = trip.attendees.find((a) => a.id === body.id);
     if (!target) return null;
     if (body.rsvp) target.rsvp = body.rsvp;
     if (body.name?.trim()) target.name = body.name.trim();
     const email = cleanEmail(body.email);
-    if (email) target.email = email;
+    if (email) {
+      if (email !== session) return "verify" as const;
+      target.email = email;
+    }
     const venmo = cleanHandle(body.venmo, "venmo");
     if (venmo === null) delete target.venmo;
     else if (venmo !== undefined) target.venmo = venmo;
@@ -113,6 +134,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
 
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (result === "forbidden") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result);
 }
 
@@ -122,12 +145,14 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
   const body = (await req.json().catch(() => null)) as { id?: string; actorId?: string } | null;
   if (!body?.id || !body.actorId)
     return NextResponse.json({ error: "id and actorId are required" }, { status: 400 });
+  const session = await getSessionEmail();
 
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
-    const actor = trip.attendees.find((a) => a.id === body.actorId);
-    if (!actor?.isOrganizer) return "forbidden" as const;
+    const gate = organizerGate(trip, body.actorId, session);
+    if (gate === "verify") return "verify" as const;
+    if (gate) return "forbidden" as const;
     const target = trip.attendees.find((a) => a.id === body.id);
     if (target?.isOrganizer) return "forbidden" as const;
     trip.attendees = trip.attendees.filter((a) => a.id !== body.id);
@@ -136,5 +161,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ slug:
 
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (result === "forbidden") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  if (result === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   return NextResponse.json(result);
 }

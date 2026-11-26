@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionEmail, organizerGate, VERIFY_MSG } from "@/lib/auth";
 import { getTrip, updateDB } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     endDate?: string;
   } | null;
   if (!body?.actorId) return NextResponse.json({ error: "actorId required" }, { status: 400 });
+  const session = await getSessionEmail();
 
   // Destination and dates stay mandatory on edit too — they can't be blanked.
   if (body.location !== undefined && !body.location.trim())
@@ -42,8 +44,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
   const updated = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
     if (!trip) return null;
-    const actor = trip.attendees.find((a) => a.id === body.actorId);
-    if (!actor?.isOrganizer) return "forbidden" as const;
+    const gate = organizerGate(trip, body.actorId, session);
+    if (gate === "verify") return "verify" as const;
+    if (gate) return "forbidden" as const;
     const nextStart = body.startDate ?? trip.startDate;
     const nextEnd = body.endDate ?? trip.endDate;
     if (nextEnd < nextStart) return "bad_dates" as const;
@@ -57,6 +60,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
   if (!updated) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   if (updated === "forbidden")
     return NextResponse.json({ error: "Only the organizer can edit trip details" }, { status: 403 });
+  if (updated === "verify")
+    return NextResponse.json({ error: VERIFY_MSG, code: "VERIFY_REQUIRED" }, { status: 403 });
   if (updated === "bad_dates")
     return NextResponse.json({ error: "End date must be on or after start date" }, { status: 400 });
   return NextResponse.json({ trip: updated });
