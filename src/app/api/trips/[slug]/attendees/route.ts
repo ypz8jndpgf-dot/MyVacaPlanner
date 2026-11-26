@@ -1,15 +1,29 @@
 import { NextResponse } from "next/server";
+import { cleanEmail } from "@/lib/email";
 import { newId, updateDB } from "@/lib/store";
 import type { Attendee, Rsvp } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-/** Join a trip with a display name (the link is the key). */
+/** Join a trip with a display name (the link is the key). Email is a
+ *  mandatory part of joining since Nov 26, 2026 — it's the identity anchor
+ *  attendees expect and how trip mail (announcements, pass upgrades) reaches
+ *  them. A name already on the list that has no email yet must supply one to
+ *  claim; a name with an email on file claims with one tap as before. */
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const body = (await req.json().catch(() => null)) as { name?: string; rsvp?: Rsvp } | null;
+  const body = (await req.json().catch(() => null)) as {
+    name?: string;
+    rsvp?: Rsvp;
+    email?: string;
+    /** True when someone else adds this name (contacts picker): the adder
+     *  can't know the person's email, so creation is allowed without one —
+     *  mandatory email then bites when that person claims the name. */
+    addedByOther?: boolean;
+  } | null;
   if (!body?.name?.trim())
     return NextResponse.json({ error: "name is required" }, { status: 400 });
+  const email = cleanEmail(body.email);
 
   const result = await updateDB((db) => {
     const trip = db.trips.find((t) => t.slug === slug);
@@ -19,21 +33,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
       (a) => a.name.trim().toLowerCase() === body.name!.trim().toLowerCase()
     );
     if (existing) {
+      if (!existing.email) {
+        // Legacy (pre-email) record: claiming it requires an email.
+        if (!email) return "email-required" as const;
+        existing.email = email;
+      } else if (email) {
+        existing.email = email; // let a claim correct a typo'd address
+      }
       if (body.rsvp) existing.rsvp = body.rsvp;
       return { attendee: existing, trip };
     }
+    if (!email && !body.addedByOther) return "email-required" as const;
     const attendee: Attendee = {
       id: newId("att"),
       name: body.name!.trim(),
       rsvp: body.rsvp ?? "in",
       isOrganizer: false,
       createdAt: Date.now(),
+      ...(email ? { email } : {}),
     };
     trip.attendees.push(attendee);
     return { attendee, trip };
   });
 
   if (!result) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+  if (result === "email-required")
+    return NextResponse.json(
+      { error: "A valid email is required — it's how this trip reaches you.", code: "EMAIL_REQUIRED" },
+      { status: 400 }
+    );
   return NextResponse.json(result, { status: 201 });
 }
 
@@ -55,6 +83,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     actorId?: string;
     rsvp?: Rsvp;
     name?: string;
+    email?: string;
     venmo?: string;
     cashapp?: string;
   } | null;
@@ -71,6 +100,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ slug: 
     if (!target) return null;
     if (body.rsvp) target.rsvp = body.rsvp;
     if (body.name?.trim()) target.name = body.name.trim();
+    const email = cleanEmail(body.email);
+    if (email) target.email = email;
     const venmo = cleanHandle(body.venmo, "venmo");
     if (venmo === null) delete target.venmo;
     else if (venmo !== undefined) target.venmo = venmo;

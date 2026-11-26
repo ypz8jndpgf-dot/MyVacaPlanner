@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanEmail } from "@/lib/email";
 import { loadDB, makeSlug, newId, updateDB } from "@/lib/store";
 import type { Trip } from "@/lib/types";
 
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
     startDate?: string;
     endDate?: string;
     organizerName?: string;
+    organizerEmail?: string;
   } | null;
   // Destination ("endpoint") and both dates are mandatory (user directive
   // 2026-11-10): a trip without a place has no weather, events, activities
@@ -54,6 +56,15 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: "name, destination, startDate, endDate and organizerName are required" },
+      { status: 400 }
+    );
+  }
+  // The organizer's email is mandatory too (Nov 26, 2026): it's the identity
+  // anchor for the account-style experience and how trip mail reaches them.
+  const organizerEmail = cleanEmail(body.organizerEmail);
+  if (!organizerEmail) {
+    return NextResponse.json(
+      { error: "A valid organizer email is required.", code: "EMAIL_REQUIRED" },
       { status: 400 }
     );
   }
@@ -83,6 +94,7 @@ export async function POST(req: Request) {
           rsvp: "in",
           isOrganizer: true,
           createdAt: Date.now(),
+          email: organizerEmail,
         },
       ],
       schedule: [],

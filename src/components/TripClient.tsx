@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Attendee, Expense, Flight, LodgingInfo, PackingItem, Poll, Rsvp, ScheduleItem, SharePayment, SharePaymentMethod, ShoppingItem, Trip } from "@/lib/types";
+import { cleanEmail } from "@/lib/email";
 import { computeBalances, dateRange, formatDate, formatMoney, formatTime, organizerIds, settleUp, shareCentsFor } from "@/lib/logic";
 import {
   ArrowRightIcon,
@@ -329,6 +330,10 @@ function JoinCard({
   onAdded?: () => void;
 }) {
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  // A listed name with no email on file yet: tapping it starts a claim that
+  // completes only once a valid email is entered (email is mandatory).
+  const [claimFor, setClaimFor] = useState<Attendee | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [addedNote, setAddedNote] = useState("");
@@ -339,17 +344,32 @@ function JoinCard({
     setContactsOk(contactsPickerAvailable());
   }, []);
 
-  async function join(rsvp: Rsvp, joinName: string) {
+  async function join(rsvp: Rsvp, joinName: string, joinEmail?: string) {
     if (!joinName.trim()) return;
     setBusy(true);
     setError("");
     try {
-      const data = await api(`/api/trips/${slug}/attendees`, "POST", { name: joinName.trim(), rsvp });
+      const data = await api(`/api/trips/${slug}/attendees`, "POST", {
+        name: joinName.trim(),
+        rsvp,
+        ...(joinEmail ? { email: joinEmail } : {}),
+      });
       onJoined(data.attendee);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Tap-a-name: instant when the record already has an email; otherwise it
+   *  opens the email step inside the claim panel first. */
+  function tapName(a: Attendee) {
+    if (a.email) {
+      void join(a.rsvp, a.name);
+    } else {
+      setClaimFor(a);
+      setError("");
     }
   }
 
@@ -381,7 +401,7 @@ function JoinCard({
     setBusy(true);
     try {
       for (const n of fresh) {
-        await api(`/api/trips/${slug}/attendees`, "POST", { name: n, rsvp: "in" });
+        await api(`/api/trips/${slug}/attendees`, "POST", { name: n, rsvp: "in", addedByOther: true });
       }
       setAddedNote(`Added ${fresh.length} ${fresh.length === 1 ? "name" : "names"} from your contacts ✓`);
       onAdded?.();
@@ -416,8 +436,10 @@ function JoinCard({
                   <button
                     key={a.id}
                     disabled={busy}
-                    onClick={() => join(a.rsvp, a.name)}
-                    className="inline-flex items-center gap-2 rounded-full bg-white py-1.5 pl-1.5 pr-4 font-display text-base font-bold text-teal-dark shadow ring-2 ring-amber transition hover:bg-amber/20 disabled:opacity-50"
+                    onClick={() => tapName(a)}
+                    className={`inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 font-display text-base font-bold text-teal-dark shadow ring-2 transition disabled:opacity-50 ${
+                      claimFor?.id === a.id ? "bg-amber ring-teal-deep" : "bg-white ring-amber hover:bg-amber/20"
+                    }`}
                   >
                     <Avatar name={a.name} size="sm" />
                     {a.name}
@@ -425,6 +447,34 @@ function JoinCard({
                   </button>
                 ))}
               </div>
+              {claimFor && (
+                <div className="mt-3 rounded-xl bg-white/80 p-3 ring-1 ring-amber">
+                  <label className={labelCls} htmlFor="claim-email">
+                    Claiming {claimFor.name} — your email (required)
+                  </label>
+                  <input
+                    id="claim-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputCls}
+                  />
+                  <button
+                    disabled={busy || !cleanEmail(email)}
+                    onClick={() => {
+                      const em = cleanEmail(email);
+                      if (em && claimFor) void join(claimFor.rsvp, claimFor.name, em);
+                    }}
+                    className="btn-coral mt-2.5 w-full py-2.5 disabled:opacity-50"
+                  >
+                    Claim my spot 🙌
+                  </button>
+                  <p className="mt-1.5 text-center text-[11px] font-semibold text-ink-soft">
+                    Trip updates only — never marketing, never shared outside this trip.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="my-4 flex items-center gap-3 text-[11px] font-extrabold uppercase tracking-widest text-ink-soft/70">
               <span className="h-px flex-1 bg-cream-edge" /> New here? <span className="h-px flex-1 bg-cream-edge" />
@@ -439,6 +489,18 @@ function JoinCard({
           onChange={(e) => setName(e.target.value)}
           className={inputCls}
         />
+        <label className={`${labelCls} mt-3 block`} htmlFor="join-email">Your email (required)</label>
+        <input
+          id="join-email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className={inputCls}
+        />
+        <p className="mt-1 text-[11px] font-semibold text-ink-soft">
+          It&apos;s how this trip reaches you — announcements and upgrades. Never marketing, never shared.
+        </p>
         {contactsOk && (
           <button
             type="button"
@@ -451,15 +513,15 @@ function JoinCard({
         )}
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
-            disabled={busy || !name.trim()}
-            onClick={() => join("in", name)}
+            disabled={busy || !name.trim() || !cleanEmail(email)}
+            onClick={() => join("in", name, cleanEmail(email) ?? undefined)}
             className="btn-coral py-3"
           >
             I&apos;m in 🙌
           </button>
           <button
-            disabled={busy || !name.trim()}
-            onClick={() => join("out", name)}
+            disabled={busy || !name.trim() || !cleanEmail(email)}
+            onClick={() => join("out", name, cleanEmail(email) ?? undefined)}
             className="btn-ghost py-3"
           >
             Can&apos;t make it

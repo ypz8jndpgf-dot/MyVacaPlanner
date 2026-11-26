@@ -6,6 +6,12 @@ export interface Attendee {
   rsvp: Rsvp;
   isOrganizer: boolean;
   createdAt: number;
+  /** Contact email — the identity anchor. Required by the API for every new
+   *  join, claim, and trip creation since Nov 26, 2026; optional in the type
+   *  only because pre-email records don't have one (those attendees are
+   *  prompted for it when they next claim their name). Used for trip mail
+   *  only — never marketing, never shared outside the trip. */
+  email?: string;
   /** Optional payment handles (no @ / $ prefix) for one-tap settle-up links. */
   venmo?: string;
   cashapp?: string;

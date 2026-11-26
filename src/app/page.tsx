@@ -60,7 +60,7 @@ function CrewStack({ count }: { count: number }) {
 export default function HomePage() {
   const router = useRouter();
   const [trips, setTrips] = useState<TripSummary[]>([]);
-  const [form, setForm] = useState({ name: "", location: "", startDate: "", endDate: "", organizerName: "" });
+  const [form, setForm] = useState({ name: "", location: "", startDate: "", endDate: "", organizerName: "", organizerEmail: "" });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -421,6 +421,21 @@ export default function HomePage() {
                     📇 Pick from contacts
                   </button>
                 )}
+              </div>
+              <div>
+                <label className="label-warm" htmlFor="organizer-email">Your email (your key to the trip)</label>
+                <input
+                  id="organizer-email"
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  value={form.organizerEmail}
+                  onChange={(e) => setForm({ ...form, organizerEmail: e.target.value })}
+                  className="input-warm"
+                />
+                <p className="mt-1 text-xs font-semibold text-ink-soft">
+                  Trip updates only — announcements and upgrades. Never marketing, never shared.
+                </p>
               </div>
               <div>
                 <label className="label-warm" htmlFor="trip-location">Where to?</label>
